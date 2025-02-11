@@ -1,0 +1,3 @@
+load_from:
+  - python_file: etl/dagster_etl.py
+

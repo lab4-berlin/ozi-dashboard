@@ -1,0 +1,19 @@
+# Ignore data files
+data/
+
+# Ignore sql files
+sql/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore environment folders
+env/
+venv/
+dagster_env/
+
+# Ignore log files
+logs/
+*.log
