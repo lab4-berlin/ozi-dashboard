@@ -1,13 +1,13 @@
 # ozi-dashboard
 
-1. Create Postgres Database (anywhere - locally or in the cloud)
-2. Use strong password for user `postgres` while creating DB
-3. Go to your ETL instance
-4. Download code by cloning Git Repository
+## Setup database
+- Get Postgres server (anywhere - locally or in the cloud), you will need it's hostnamem and password for the user postgres
+- Go to your ETL instance (any Unix machine with access to the Postgres Database)
+- Download code by cloning Git Repository
 ```
   git clone https://github.com/lab4-berlin/ozi-dashboard.git
 ```
-5. Create database, user and tables 
+- Create database, user and tables 
 ```
   cd ozi-dashboard
   ./init_database.sh
