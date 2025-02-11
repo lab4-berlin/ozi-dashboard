@@ -4,11 +4,11 @@
 - Get Postgres server (anywhere - locally or in the cloud), you will need it's hostnamem and password for the user postgres
 - Go to your ETL instance (any Unix machine with access to the Postgres Database)
 - Download code by cloning Git Repository
-```
+```bash
   git clone https://github.com/lab4-berlin/ozi-dashboard.git
 ```
 - Create database, user and tables 
-```
+```bash
   cd ozi-dashboard
   ./init_database.sh
 ```
@@ -29,7 +29,7 @@ DB_PORT=5432
 ```
 
 ## Dagster
-```
+```bash
 sudo apt install python3-pip
 sudo apt install python3.12-venv
 python3 -m venv dagster_env
