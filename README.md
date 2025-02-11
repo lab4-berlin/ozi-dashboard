@@ -13,6 +13,21 @@
   ./init_database.sh
 ```
 
+## Secrets
+```bash
+create file .env in ozi-dashboard
+assure that it is added to .gitignore and does net end up in your repository
+
+.env content:
+------------------------------------
+DB_NAME=my_database
+DB_USER=my_user
+DB_PASSWORD=my_secure_password
+DB_HOST=ip-or-url
+DB_PORT=5432
+------------------------------------
+```
+
 ## Dagster
 ```
 sudo apt install python3-pip
