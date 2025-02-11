@@ -1,24 +1,16 @@
 # ozi-dashboard
 
-1. Create Postgres instance on GCP, name it `asn-stats`
+1. Create Postgres Database (anywhere - locally or in the cloud)
 2. Use strong password for user `postgres` while creating DB
-3. Go to `asn-stats`'s console
+3. Go to your ETL instance
 4. Download code by cloning Git Repository
 ```
-  git clone https://github.com/ilja-vladi/as-stats.git
+  git clone https://github.com/lab4-berlin/ozi-dashboard.git
 ```
-5. Create database, user and tables for asn_stats project
-  - when asked for password use postgres password from step 2 first
-  - and asn_data password for the second sql script
-
+5. Create database, user and tables 
 ```
-  cd as-stats
+  cd ozi-dashboard
   ./init_database.sh
-  
-```
-## TMP
-```
-cat sql/*.sql | gcloud sql connect asn-stats2 --user=asn_stats
 ```
 
 ## Dagster
@@ -29,4 +21,6 @@ python3 -m venv dagster_env
 source dagster_env/bin/activate
 pip install dagster dagster-webserver dagster-postgres
 dagster project scaffold --name=dagster_etl
+
+dagster dev --host 0.0.0.0 --port 3000
 ```
