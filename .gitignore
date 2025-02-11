@@ -17,3 +17,6 @@ dagster_env/
 # Ignore log files
 logs/
 *.log
+
+# Secrets file
+.env
