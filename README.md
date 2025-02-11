@@ -1,4 +1,4 @@
-# as-stats
+# ozi-dashboard
 
 1. Create Postgres instance on GCP, name it `asn-stats`
 2. Use strong password for user `postgres` while creating DB
@@ -21,13 +21,12 @@
 cat sql/*.sql | gcloud sql connect asn-stats2 --user=asn_stats
 ```
 
-## TODO
-- 5min stats instead of daily
-- index connectivity - load neighbours
-- 
-
-## Conference
-data insights for countries with 'risky internet', comparition
-connectivity index, reliability(?) index - how many asns guaranty connections to the outside
-proposal for presentation
-show riskis of "чебурнотизация" for different countries
+## Dagster
+```
+sudo apt install python3-pip
+sudo apt install python3.12-venv
+python3 -m venv dagster_env
+source dagster_env/bin/activate
+pip install dagster dagster-webserver dagster-postgres
+dagster project scaffold --name=dagster_etl
+```
