@@ -5,18 +5,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.sql.functions import current_date
 from sqlalchemy import text
 
-USER = os.getenv("OZI_DATABASE_USER", 'asn_stats')
-PASSWORD = os.getenv("OZI_DATABASE_PASSWORD", None)
-DBNAME = os.getenv("OZI_DATABASE_NAME", 'asn_stats')
-PORT = os.getenv("OZI_DATABASE_PORT", '5432')
-HOST = os.getenv("OZI_DATABASE_HOST", '34.32.74.250')
+from dotenv import load_dotenv
+load_dotenv()
 
 BATCH_SIZE = 1000
 
 def get_db_connection():
-    encoded_password = urllib.parse.quote(PASSWORD)
-    connection_string = f"postgresql://{USER}:{encoded_password}@{HOST}:{PORT}/{DBNAME}"
-    # print(connection_string)
+    encoded_password = urllib.parse.quote(DB_PASSWORD)
+    connection_string = f"postgresql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     engine = create_engine(connection_string)
     return engine.connect()
 
@@ -39,7 +35,7 @@ def insert_country_asns_to_db(country_iso2, list_of_asns, save_sql_to_file=False
         c.commit()
 
 
-def insert_country_stats_to_db(country_iso2, resolution, stats, save_sql_to_file=False, load_to_database=True):
+def insert_country_stats_to_db(country_iso2, resolution, stats, db_connection):
     sql= ("INSERT INTO data.country_stat(cs_country_iso2, cs_stats_timestamp, cs_stats_resolution, cs_v4_prefixes_ris,"
           " cs_v6_prefixes_ris, cs_asns_ris, cs_v4_prefixes_stats, cs_v6_prefixes_stats, cs_asns_stats )\nVALUES ")
     for item in stats:
@@ -52,16 +48,9 @@ def insert_country_stats_to_db(country_iso2, resolution, stats, save_sql_to_file
                 f"{item['asns_stats'] if item['asns_stats'] else 'NULL'} ),")
     sql = sql[:-1] + ";"
 
-    if save_sql_to_file:
-        filename = "sql/country_stats_{}_{}.sql".format(country_iso2, datetime.now().strftime('%Y%m%d_%H%M%S'))
-        with open(filename, 'w') as f:
-            print(sql, file=f)
-
-    if load_to_database:
-        c = get_db_connection()
-        query = text(sql)
-        c.execute(query)
-        c.commit()
+    query = text(sql)
+    db_connection.execute(query)
+    db_connection.commit()
 
 def insert_country_asn_neighbours_to_db(country_iso2, neighbours, save_sql_to_file=False, load_to_database=True):
     # connection = get_db_connection(PASSWORD)
