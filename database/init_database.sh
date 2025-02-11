@@ -23,3 +23,4 @@ psql --host=$DBHOST --username=postgres $DBNAME  -c "GRANT ALL PRIVILEGES ON DAT
 export PGPASSWORD=$DBPASSWORD
 echo 'Creating the database schema...'
 psql --host=$DBHOST --username=$DBUSER $DBNAME -f create_database_schema.sql
+psql --host=$DBHOST --username=$DBUSER $DBNAME -f insert_countries.sql

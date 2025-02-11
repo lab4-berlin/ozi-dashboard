@@ -1,6 +1,6 @@
-from load_to_database import BATCH_SIZE
-from extract_from_cloudflare_api import get_cloudflare_traffic_for_country, get_cloudflare_internet_quality_for_country
-from extract_from_ripe_api import get_country_asns, get_country_resource_stats, get_asn_neighbours
+from etl.load_to_database import BATCH_SIZE
+from etl.extract_from_cloudflare_api import get_cloudflare_traffic_for_country, get_cloudflare_internet_quality_for_country
+from etl.extract_from_ripe_api import get_country_asns, get_country_resource_stats, get_asn_neighbours
 
 BAR_LENGTH = 50
 

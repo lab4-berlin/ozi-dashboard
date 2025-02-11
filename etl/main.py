@@ -1,11 +1,9 @@
-import argparse
-from load_to_database import *
-from country_lists import *
-from etl_jobs import get_internet_quality_for_country
+from etl.load_to_database import *
+from etl.country_lists import *
+from etl.etl_jobs import *
 from datetime import datetime, timedelta
+import argparse
 
-from etl_jobs import get_list_of_asns_for_country, get_stats_for_country, get_list_of_asn_neighbours_for_country, \
-    get_traffic_for_country
 
 CLOUDFLARE_API_TOKEN=os.getenv('OZI_CLOUDFLARE_API_TOKEN')
 
