@@ -1,3 +1,3 @@
 load_from:
-  - python_file: etl/dagster_etl.py
+  - python_file: etl/repository.py
 

@@ -35,23 +35,6 @@ def insert_country_asns_to_db(country_iso2, list_of_asns, save_sql_to_file=False
         c.commit()
 
 
-def insert_country_stats_to_db(country_iso2, resolution, stats, db_connection):
-    sql= ("INSERT INTO data.country_stat(cs_country_iso2, cs_stats_timestamp, cs_stats_resolution, cs_v4_prefixes_ris,"
-          " cs_v6_prefixes_ris, cs_asns_ris, cs_v4_prefixes_stats, cs_v6_prefixes_stats, cs_asns_stats )\nVALUES ")
-    for item in stats:
-        sql +=  (f"\n('{country_iso2}', '{item['timeline'][0]['starttime']}', '{resolution}', "
-                f"{item['v4_prefixes_ris'] if item['v4_prefixes_ris'] else 'NULL'}, "
-                f"{item['v6_prefixes_ris'] if item['v6_prefixes_ris'] else 'NULL'}, "
-                f"{item['asns_ris'] if item['asns_ris'] else 'NULL'}, "
-                f"{item['v4_prefixes_stats'] if item['v4_prefixes_stats'] else 'NULL'}, "
-                f"{item['v6_prefixes_stats'] if item['v6_prefixes_stats'] else 'NULL'}, "
-                f"{item['asns_stats'] if item['asns_stats'] else 'NULL'} ),")
-    sql = sql[:-1] + ";"
-
-    query = text(sql)
-    db_connection.execute(query)
-    db_connection.commit()
-
 def insert_country_asn_neighbours_to_db(country_iso2, neighbours, save_sql_to_file=False, load_to_database=True):
     # connection = get_db_connection(PASSWORD)
     sql = "INSERT INTO data.asn_neighbour (an_asn, an_neighbour, an_date, an_type, an_power, an_v4_peers, an_v6_peers)\n VALUES "
