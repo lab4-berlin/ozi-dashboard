@@ -10,23 +10,13 @@ class Stats1dConfig(Config):
     date_to: str
 
 
-@asset(
-    config_schema={
-        "iso2": str,
-        "date_from": str,
-        "date_to": str
-    },
-    required_resource_keys={"db"}  # Ensuring the database resource is available
-)
-def etl_load_stats_1d(context):
+@asset( required_resource_keys={"db"})
+def etl_load_stats_1d(context, config:Stats1dConfig):
     """
     Extracts daily statistics for a given country and date range,
     and loads them into the database.
     """
-    config = context.op_config  # Fetch configuration from UI
-
-    if None in (config["iso2"], config["date_from"], config["date_to"]):
-        raise ValueError("All ETL Job parameters must be set")
+    config = context.config  # Fetch configuration from UI
 
     context.log.info(
         f"Running ETL load_stats_1d for {config['iso2']} from {config['date_from']} to {config['date_to']}.")
