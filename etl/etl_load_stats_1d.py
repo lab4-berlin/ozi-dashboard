@@ -16,20 +16,19 @@ def etl_load_stats_1d(context, config:Stats1dConfig):
     Extracts daily statistics for a given country and date range,
     and loads them into the database.
     """
-    config = context.config  # Fetch configuration from UI
 
     context.log.info(
-        f"Running ETL load_stats_1d for {config['iso2']} from {config['date_from']} to {config['date_to']}.")
+        f"Running ETL load_stats_1d for {config.iso2} from {config.date_from} to {config.date_to}.")
 
-    stats = get_stats_for_country(config["iso2"], config["date_from"], config["date_to"], '1d')
+    stats = get_stats_for_country(config.iso2, config.date_from, config.date_to, '1d')
     if stats:
-        insert_country_stats_to_db(config["iso2"], '1d', stats, context.resources.db)
+        insert_country_stats_to_db(config.iso2, '1d', stats, context.resources.db)
         context.log.info(
-            f"Successfully loaded {len(stats)} rows for {config['iso2']} from {config['date_from']} to {config['date_to']}.")
+            f"Successfully loaded {len(stats)} rows for {config.iso2} from {config.date_from} to {config.date_to}.")
     else:
-        context.log.warning(f"No stats found for {config['iso2']} from {config['date_from']} to {config['date_to']}.")
+        context.log.warning(f"No stats found for {config.iso2} from {config.date_from} to {config.date_to}.")
 
-
+#move to i/o manager
 def insert_country_stats_to_db(country_iso2, resolution, stats, db_engine):
     sql = "INSERT INTO data.country_stat(cs_country_iso2, cs_stats_timestamp, cs_stats_resolution, cs_v4_prefixes_ris," \
           " cs_v6_prefixes_ris, cs_asns_ris, cs_v4_prefixes_stats, cs_v6_prefixes_stats, cs_asns_stats )\nVALUES "
