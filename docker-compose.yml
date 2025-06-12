@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13-alpine
+    container_name: as_stats_postgres
+    restart: always
+    environment:
+      # These should ideally be set via a .env file
+      # Create a .env file in the same directory as this docker-compose.yml
+      # with the following content:
+      # POSTGRES_USER=youruser
+      # POSTGRES_PASSWORD=yourpassword
+      # POSTGRES_DB=as_stats_db
+      POSTGRES_USER: ${POSTGRES_USER:-user} # Default to 'user' if not set in .env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password} # Default to 'password' if not set in .env
+      POSTGRES_DB: ${POSTGRES_DB:-as_stats_db} # Default to 'as_stats_db' if not set in .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432" # Exposes PostgreSQL to the host on port 5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-user} -d $${POSTGRES_DB:-as_stats_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  etl:
+    build:
+      context: ./etl
+      dockerfile: Dockerfile
+    container_name: as_stats_etl
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy # Wait for postgres to be healthy
+    environment:
+      # These should also ideally be set via the .env file mentioned above
+      # Ensure these match the postgres service credentials
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-as_stats_db}
+      DB_USER: ${POSTGRES_USER:-user}
+      DB_PASS: ${POSTGRES_PASSWORD:-password}
+      # Add any other environment variables your ETL process might need
+      # For example, if your ETL scheduler takes arguments for job files:
+      # JOB_FILE: "etl/jobs/your_default_job.yaml" # This would need to be adapted in your CMD
+    command: ["etl/jobs/load_asns_report_May25.yaml"]
+    # You can override this from CLI:
+    # docker-compose run etl etl/jobs/your_job.yaml
+
+volumes:
+  pgdata: # Defines the named volume for PostgreSQL data persistence
