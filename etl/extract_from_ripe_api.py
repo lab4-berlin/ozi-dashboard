@@ -56,7 +56,7 @@ def save_api_response(url, params, response, save_mode = None):
         params_string = json.dumps(params, separators=(",", ":"))
         str = f'{url}{params_string}'
         str = re.sub(r'[{},.<>:"/\\|?*]', '_', str)
-        filename = f'data/ripe_response_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{str}.json'
+        filename = f"data/ripe_response_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{str}.json"
 
         with open(filename, 'w') as f:
             print(response, file=f)

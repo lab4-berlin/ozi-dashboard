@@ -14,7 +14,7 @@ HOST = os.getenv("OZI_DATABASE_HOST", '34.32.74.250')
 BATCH_SIZE = 1000
 
 def get_db_connection():
-    encoded_password = urllib.parse.quote(PASSWORD)
+    encoded_password = urllib.parse.quote(str(PASSWORD))
     connection_string = f"postgresql://{USER}:{encoded_password}@{HOST}:{PORT}/{DBNAME}"
     # print(connection_string)
     engine = create_engine(connection_string)

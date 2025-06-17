@@ -1,1 +1,2 @@
 etl/logs/*
+*.env

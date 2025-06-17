@@ -15,7 +15,7 @@ def display_progress(processed, total, processed_until_date, received_from_api, 
     else:
         bar += '-' * (50 - filled_length) + '| ' + date_str
 
-    print(f'\r{' ' * 12}{bar} Received: {received_from_api}, Stored: {stored_to_database}   {custom_msg}', end=' ', flush=True)
+    print(f"\r{' ' * 12}{bar} Received: {received_from_api}, Stored: {stored_to_database}   {custom_msg}", end=' ', flush=True)
 
 
 def get_list_of_asns_for_country(country_iso2, dates, batch_size, verbose=True):

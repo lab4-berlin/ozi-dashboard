@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: as_stats_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_HOST_AUTH_METHOD: password
+    volumes:
+      - ./create_database_schema.sql:/docker-entrypoint-initdb.d/create_database_schema.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-user} -d $${POSTGRES_DB:-ozi_db2}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  etl:
+    build:
+      context: ./etl
+      dockerfile: Dockerfile
+    container_name: as_stats_etl
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ozi_db2}
+      DB_USER: ${POSTGRES_USER:-ozi}
+      DB_PASS: ${POSTGRES_PASSWORD:-password}
+      OZI_DATABASE_HOST:     postgres
+      OZI_DATABASE_PORT:     5432
+      OZI_DATABASE_NAME:     ${OZI_DATABASE_NAME:-ozi_db2}
+      OZI_DATABASE_USER:     ${OZI_DATABASE_USER:-ozi}
+      OZI_DATABASE_PASSWORD: ${OZI_DATABASE_PASSWORD:-password}
+    volumes:
+      - ./etl/logs:/app/etl/logs
+    #command: ["./etl/jobs/load_asns_report_May25.yaml"]
+    # You can override this from CLI:
+    # docker-compose run etl etl/jobs/your_job.yaml
+
+volumes:
+  pgdata: # Defines the named volume for PostgreSQL data persistence
