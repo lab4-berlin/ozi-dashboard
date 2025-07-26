@@ -1,0 +1,6 @@
+dash
+plotly
+numpy
+pandas
+sqlalchemy
+psycopg2-binary

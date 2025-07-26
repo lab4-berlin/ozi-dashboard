@@ -14,6 +14,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-db}
     volumes:
       - ./create_database_schema.sql:/docker-entrypoint-initdb.d/create_database_schema.sql:ro
+      - ./init_dash_sample.sql:/docker-entrypoint-initdb.d/init_dash_sample.sql:ro
       - ./ozi_pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
@@ -49,6 +50,26 @@ services:
       OZI_DATABASE_PASSWORD: ${POSTGRES_OZI_PASSWORD:-password}
     volumes:
       - ./etl/logs:/app/etl/logs
+    networks:
+      - ozi_network
+
+  dash-app:
+    build:
+      context: ./dash
+      dockerfile: Dockerfile
+    container_name: dash_app
+    restart: always
+    depends_on:
+      ozi-postgres:
+        condition: service_healthy
+    environment:
+      DASH_DB_HOST: ozi-postgres
+      DASH_DB_PORT: 5432
+      DASH_DB_NAME: ${POSTGRES_DB:-db}
+      DASH_DB_USER: ${POSTGRES_USER:-postgres}
+      DASH_DB_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    ports:
+      - "8050:8050"
     networks:
       - ozi_network
 
