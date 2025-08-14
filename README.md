@@ -118,6 +118,30 @@ Here is an example of how to run the `ASN_NEIGHBOURS` task for the Czech Republi
 docker compose run ozi-etl -t ASN_NEIGHBOURS -c CZ -df 2025-05-01 -dt 2025-05-31 -dr D
 ```
 
+## Running Daily STATS_1D Job
+
+The system includes a daily cron job that automatically fetches the latest STATS_1D data. The job:
+
+1. Determines the last date in the database
+2. Runs the ETL job from that date to today
+3. Prevents duplicate data by only inserting new records
+
+To start the cron service, run:
+
+```sh
+docker compose up -d ozi-etl-cron
+```
+
+The cron job runs daily at 2:00 AM and logs its output to `etl/logs/daily_stats_1d.log`.
+
+To manually trigger the daily STATS_1D job, you can run:
+
+```sh
+docker compose run --rm --entrypoint="" ozi-etl-cron /app/etl/run_daily_stats_1d.sh
+```
+
+Note: The cron service is separate from the main ETL service to keep the main service lightweight.
+
 ## Stopping Services
 
 To stop the services, run:
