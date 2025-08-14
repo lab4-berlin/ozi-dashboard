@@ -54,6 +54,32 @@ services:
     networks:
       - ozi_network
 
+  ozi-etl-cron:
+    build:
+      context: ./etl
+      dockerfile: Dockerfile.cron
+    env_file:
+      - .env.ozi
+    container_name: ozi_etl_cron
+    depends_on:
+      ozi-postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: ozi-postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ozi_db2}
+      DB_USER: ${POSTGRES_OZI_USER:-ozi}
+      DB_PASS: ${POSTGRES_OZI_PASSWORD:-ozi_password}
+      OZI_DATABASE_HOST:     ozi-postgres
+      OZI_DATABASE_PORT:     5432
+      OZI_DATABASE_NAME:     ${POSTGRES_DB:-ozi_db2}
+      OZI_DATABASE_USER:     ${POSTGRES_OZI_USER:-ozi}
+      OZI_DATABASE_PASSWORD: ${POSTGRES_OZI_PASSWORD:-ozi_password}
+    volumes:
+      - ./etl/logs:/app/etl/logs
+    networks:
+      - ozi_network
+
   plotly-dash-app:
     build:
       context: ./plotly_dash

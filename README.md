@@ -140,7 +140,7 @@ You can simulate the GitHub Actions CI workflow locally using `act`. This is use
 
 **Prerequisites for `act`:**
 
-*   `act` installed (e.g., `nix run nixpkgs#act` if you use Nix, or follow `act`'s installation instructions for your OS).
+*   `act` installed, https://github.com/nektos/act.
 *   Docker Engine running on your machine.
 
 To run the `pull_request` workflow defined in `.github/workflows/ci.yml` locally:
@@ -148,6 +148,30 @@ To run the `pull_request` workflow defined in `.github/workflows/ci.yml` locally
 ```sh
 act pull_request
 ```
+
+## Running Daily STATS_1D Job
+
+The system includes a daily cron job that automatically fetches the latest STATS_1D data. The job:
+
+1. Determines the last date in the database
+2. Runs the ETL job from that date to today
+3. Prevents duplicate data by only inserting new records
+
+To start the cron service, run:
+
+```sh
+docker compose up -d ozi-etl-cron
+```
+
+The cron job runs daily at 2:00 AM and logs its output to `etl/logs/daily_stats_1d.log`.
+
+To manually trigger the daily STATS_1D job, you can run:
+
+```sh
+docker compose run --rm --entrypoint="" ozi-etl-cron /app/etl/run_daily_stats_1d.sh
+```
+
+Note: The cron service is separate from the main ETL service to keep the main service lightweight.
 
 ## Stopping Services
 
