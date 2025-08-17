@@ -91,10 +91,7 @@ def get_list_of_asns_for_country(country_iso2, dates, batch_size, verbose=True):
 
 
 def get_stats_for_country(country_iso2, date_from, date_to, resolution):
-    print(
-        f"    Getting historical stats {country_iso2}, {resolution}, {date_from}, {date_to}",
-        end=" ... ",
-    )
+    print(f"    Getting historical stats {country_iso2}, {resolution}, {date_from}, {date_to}", end=" ... ")
     d = get_country_resource_stats(
         country_iso2, resolution, date_from, save_mode="file"
     )
@@ -156,7 +153,7 @@ def get_traffic_for_country(country_iso2, token):
     d = get_cloudflare_traffic_for_country(country_iso2, token, copy_to_file=True)
 
     if not d or "result" not in d or "main" not in d["result"]:
-        print("No traffic data found or invalid response.")
+        print(f"{'No traffic data found or invalid response.':<50}")
         return None
     else:
         traffic = d["result"]["main"]
@@ -172,7 +169,7 @@ def get_internet_quality_for_country(country_iso2, token):
     )
 
     if not d or "result" not in d or "main" not in d["result"]:
-        print("No internet quality data found or invalid response.")
+        print(f"{'No internet quality data found or invalid response.':<50}")
         return None
     else:
         internet_quality = d["result"]["main"]

@@ -127,7 +127,7 @@ def generate_dates(date_from, date_to, resolution):
 
 
 def etl_load_asns(iso2, dates):
-    print("Getting data from the API and storing to DB...")
+    print(f"{'Getting data from the API and storing to DB...':<50}")
     for asns_batch in get_list_of_asns_for_country(iso2, dates, BATCH_SIZE):
         insert_country_asns_to_db(iso2, asns_batch)
 
