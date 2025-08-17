@@ -54,13 +54,13 @@ class TestETLJobs(unittest.TestCase):
 
         mock_get_stats.return_value = [{"stat": "some"}]
 
-        etl_load_stats_5m(iso2, dates)
+        etl_load_stats_5m(iso2, dates, save_to_file=False)
 
         mock_get_stats.assert_called_once_with(
             iso2, datetime(2023, 1, 1), datetime(2024, 1, 1), "5m"
         )
         mock_insert_stats.assert_called_once_with(
-            iso2, "5m", [{"stat": "some"}], save_sql_to_file=True
+            iso2, "5m", [{"stat": "some"}], save_sql_to_file=False
         )
 
     @patch(f"{MODULE_DB}.insert_country_asn_neighbours_to_db")
@@ -86,11 +86,11 @@ class TestETLJobs(unittest.TestCase):
 
         mock_get_traffic.return_value = {"traffic": "some_data"}
 
-        etl_load_traffic(iso2, dates)
+        etl_load_traffic(iso2, dates, save_to_file=False)
 
         mock_get_traffic.assert_called_once_with(iso2, ANY)
         mock_insert_traffic.assert_called_once_with(
-            iso2, {"traffic": "some_data"}, save_sql_to_file=True
+            iso2, {"traffic": "some_data"}, save_sql_to_file=False
         )
 
     @patch(f"{MODULE_DB}.insert_internet_quality_for_country_to_db")
@@ -101,11 +101,11 @@ class TestETLJobs(unittest.TestCase):
 
         mock_get_quality.return_value = {"latency": 42}
 
-        etl_load_internet_quality(iso2, dates)
+        etl_load_internet_quality(iso2, dates, save_to_file=False)
 
         mock_get_quality.assert_called_once_with(iso2, ANY)
         mock_insert_quality.assert_called_once_with(
-            iso2, {"latency": 42}, save_sql_to_file=True
+            iso2, {"latency": 42}, save_sql_to_file=False
         )
 
 

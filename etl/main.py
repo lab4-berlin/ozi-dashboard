@@ -45,6 +45,11 @@ def main():
         required=True,
         help="Required resolution: D - Daily, W - Weekly, M - Monthly",
     )
+    parser.add_argument(
+        "--save-to-file",
+        action="store_true",
+        help="Save generated SQL to file (default: False)",
+    )
 
     args = parser.parse_args()
     task = args.task
@@ -89,7 +94,10 @@ def main():
         print(f"{'Date To:':<12} {date_to_formatted}")
         print(f"{'Resolution:':<12} {RESOLUTION_DICT[resolution]}")
 
-        task_map[task](iso2, dates.copy())
+        if task in ["STATS_5M", "TRAFFIC", "INTERNET_QUALITY"]:
+            task_map[task](iso2, dates.copy(), save_to_file=args.save_to_file)
+        else:
+            task_map[task](iso2, dates.copy())
 
         # task_map[task](iso2, generate_dates(date_from, date_to, resolution))
         # task_map[task](iso2, date_from, date_to, resolution)
@@ -139,35 +147,35 @@ def etl_load_stats_1d(iso2, dates):
             insert_country_stats_to_db(iso2, "1d", stats, save_sql_to_file=True)
 
 
-def etl_load_stats_5m(iso2, dates):
+def etl_load_stats_5m(iso2, dates, save_to_file=False):
     years = sorted(set(date.year for date in dates))
     for year in years:
         date_from = datetime(year, 1, 1)
         date_to = datetime(year + 1, 1, 1)
         stats = get_stats_for_country(iso2, date_from, date_to, "5m")
         if stats:
-            insert_country_stats_to_db(iso2, "5m", stats, save_sql_to_file=True)
+            insert_country_stats_to_db(iso2, "5m", stats, save_sql_to_file=save_to_file)
 
 
 def etl_load_asn_neighbours(iso2, dates):
-    print("Getting data from the API and storing to DB...")
+    print(f"{'Getting data from the API and storing to DB...':<50}")
     for neighbours_batch in get_list_of_asn_neighbours_for_country(
         iso2, dates, BATCH_SIZE
     ):
         insert_country_asn_neighbours_to_db(iso2, neighbours_batch)
 
 
-def etl_load_traffic(iso2, dates):
+def etl_load_traffic(iso2, dates, save_to_file=False):
     traffic = get_traffic_for_country(iso2, CLOUDFLARE_API_TOKEN)
     if traffic:
-        insert_traffic_for_country_to_db(iso2, traffic, save_sql_to_file=True)
+        insert_traffic_for_country_to_db(iso2, traffic, save_sql_to_file=save_to_file)
 
 
-def etl_load_internet_quality(iso2, dates):
+def etl_load_internet_quality(iso2, dates, save_to_file=False):
     internet_quality = get_internet_quality_for_country(iso2, CLOUDFLARE_API_TOKEN)
     if internet_quality:
         insert_internet_quality_for_country_to_db(
-            iso2, internet_quality, save_sql_to_file=True)
+            iso2, internet_quality, save_sql_to_file=save_to_file)
 
 
 if __name__ == "__main__":
