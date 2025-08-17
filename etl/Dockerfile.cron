@@ -18,6 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app/etl/
 
 RUN mkdir -p /app/etl/logs
+RUN adduser --system --no-create-home appuser
+RUN chown -R appuser:appuser /app/etl/logs
 
 # Ensure the run scripts are executable
 RUN chmod +x /app/etl/run.sh
@@ -25,7 +27,8 @@ RUN chmod +x /app/etl/run_daily_stats_1d.sh
 RUN chmod +x /app/etl/get_stats_1d_date_range.py
 
 # Set up cron job for daily STATS_1D ETL job (runs at 2:00 AM)
-RUN echo "0 2 * * * /app/etl/run_daily_stats_1d.sh >> /app/etl/logs/daily_stats_1d.log 2>&1" > /etc/cron.d/daily-stats-1d
+ARG CRON_SCHEDULE="0 2 * * *"
+RUN echo "${CRON_SCHEDULE} /app/etl/run_daily_stats_1d.sh >> /app/etl/logs/daily_stats_1d.log 2>&1" > /etc/cron.d/daily-stats-1d
 RUN chmod 0644 /etc/cron.d/daily-stats-1d
 RUN crontab /etc/cron.d/daily-stats-1d
 

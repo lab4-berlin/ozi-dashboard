@@ -48,7 +48,7 @@ def get_last_date_from_db():
         
         return None
     except Exception as e:
-        print(f"Error connecting to database or querying last date: {e}")
+        print(f"ERROR: Database connection or query failed in get_last_date_from_db: {e}", file=sys.stderr)
         return None
 
 
@@ -78,8 +78,9 @@ def main():
             # Start from the day after the last date
             start_date = last_date + timedelta(days=1)
         else:
-            # Default to 30 days ago
-            start_date = today - timedelta(days=30)
+            # Default to configurable days ago
+            default_days_ago = int(os.getenv('DEFAULT_DAYS_AGO', '30'))
+            start_date = today - timedelta(days=default_days_ago)
     
     # Ensure start_date is not in the future
     if start_date > today:
