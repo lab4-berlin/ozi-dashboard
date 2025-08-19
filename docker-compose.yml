@@ -69,9 +69,28 @@ services:
       DASH_DB_HOST: ozi-postgres
       DASH_DB_PORT: 5432
       DASH_DB_NAME: ${POSTGRES_DB:-ozi_db2}
-      
     ports:
       - "8050:8050"
+    networks:
+      - ozi_network
+
+  plotly-dash-app-2:
+    build:
+      context: ./plotly_dash
+      dockerfile: Dockerfile
+    container_name: plotly_dash_app
+    env_file:
+      - .env.ozi
+    restart: always
+    depends_on:
+      ozi-postgres:
+        condition: service_healthy
+    environment:
+      DASH_DB_HOST: ozi-postgres
+      DASH_DB_PORT: 5432
+      DASH_DB_NAME: ${POSTGRES_DB:-ozi_db2}
+    ports:
+      - "8051:8051"
     networks:
       - ozi_network
 
