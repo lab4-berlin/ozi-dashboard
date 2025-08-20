@@ -9,3 +9,10 @@ This is the homepage for the OZI Dashboard project. More content coming soon!
     height="800" 
     style="border:1px solid #ccc;">
 </iframe>
+
+## Navigation
+* [Our Projects](our-projects.md)
+* [Internet Atlas](internet-atlas.md)
+* [Shutdown Calculator](shutdown-calculator.md)
+* [Publications](publications.md)
+* [Manifesto](manifesto.md)
