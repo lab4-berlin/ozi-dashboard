@@ -8,7 +8,7 @@ on:
 jobs:
   generate-and-copy-graph:
     runs-on: ubuntu-latest
-    environment: prod
+    environment: production
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
