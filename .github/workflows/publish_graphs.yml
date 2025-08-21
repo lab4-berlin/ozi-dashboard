@@ -1,0 +1,85 @@
+name: Generate and Publish Graphs to GitHub Pages
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *' # Run daily at midnight UTC
+
+jobs:
+  generate-and-copy-graph:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Install SSHPass (for non-interactive SSH)
+      run: sudo apt-get update && sudo apt-get install -y sshpass
+
+    - name: Execute graph generation on server and copy back
+      run: |
+        SERVER_USER="${{ env.SSH_USER }}"
+        SERVER_HOST="${{ env.SSH_HOST }}"
+        REMOTE_PROJECT_PATH="${{ env.PROJECT_DIR }}"
+        GRAPH_OUTPUT_DIR="${REMOTE_PROJECT_PATH}/generated_graphs_local"
+        GRAPH_FILENAME="country_stats_ru.html"
+
+        # Ensure the output directory exists on the server's host filesystem
+        ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "mkdir -p ${GRAPH_OUTPUT_DIR}"
+
+        # Execute script on remote server using docker compose run
+        ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "\
+          cd ${REMOTE_PROJECT_PATH} && \
+          docker compose -f docker-compose.yml run --build --rm plotly-dash-app python generate_static_graph.py RU --output_dir /app/generated_graphs \
+        "
+
+        # Copy generated graph back to runner from the server's host filesystem
+        scp -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST}:${GRAPH_OUTPUT_DIR}/${GRAPH_FILENAME} ./
+
+    - name: Upload graph artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: generated-graph
+        path: country_stats_ru.html
+
+  publish-to-pages:
+    needs: generate-and-copy-graph
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+    - name: Checkout add-pages-website branch
+      uses: actions/checkout@v4
+      with:
+        ref: add-pages-website # The branch for GitHub Pages
+
+    - name: Download graph artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: generated-graph
+
+    - name: Move graph to docs directory
+      run: |
+        mkdir -p docs
+        mv country_stats_ru.html docs/country_stats_ru.html
+
+    - name: Commit and push changes
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add docs/country_stats_ru.html
+        git commit -m "Update RU country stats graph"
+        git push
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
