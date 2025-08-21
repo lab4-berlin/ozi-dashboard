@@ -23,9 +23,9 @@ jobs:
 
     - name: Execute graph generation on server and copy back
       run: |
-        SERVER_USER="${{ env.SSH_USER }}"
-        SERVER_HOST="${{ env.SSH_HOST }}"
-        REMOTE_PROJECT_PATH="${{ env.PROJECT_DIR }}"
+        SERVER_USER="${{ vars.SSH_USER }}"
+        SERVER_HOST="${{ vars.SSH_HOST }}"
+        REMOTE_PROJECT_PATH="${{ vars.PROJECT_DIR }}"
         GRAPH_OUTPUT_DIR="${REMOTE_PROJECT_PATH}/generated_graphs_local"
         GRAPH_FILENAME="country_stats_ru.html"
 
