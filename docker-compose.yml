@@ -72,6 +72,8 @@ services:
       
     ports:
       - "8050:8050"
+    volumes:
+      - ./generated_graphs_local:/app/generated_graphs
     networks:
       - ozi_network
 
