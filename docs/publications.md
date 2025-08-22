@@ -1,3 +1,6 @@
+---
+layout: default
+---
 # Publications
 
 Find our articles and analyses here.
