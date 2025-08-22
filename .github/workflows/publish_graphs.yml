@@ -26,8 +26,9 @@ jobs:
         SERVER_USER="${{ vars.SSH_USER }}"
         SERVER_HOST="${{ vars.SSH_HOST }}"
         REMOTE_PROJECT_PATH="${{ vars.PROJECT_DIR }}"
-        GRAPH_OUTPUT_DIR="${REMOTE_PROJECT_PATH}/generated_graphs_local"
-        GRAPH_FILENAME="country_stats_ru.html"
+        GRAPH_OUTPUT_DIR="${REMOTE_PROJECT_PATH}/generated_graphs" # Aligned with actual script output
+        # Define the countries to generate graphs for. Use 'all' for all countries.
+        COUNTRIES="EE RU AM" # Or "all"
 
         # Ensure the output directory exists on the server's host filesystem
         ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "mkdir -p ${GRAPH_OUTPUT_DIR}"
@@ -35,17 +36,17 @@ jobs:
         # Execute script on remote server using docker compose run
         ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "\
           cd ${REMOTE_PROJECT_PATH} && \
-          docker compose -f docker-compose.yml run --build --rm plotly-dash-app python generate_static_graph.py RU --output_dir /app/generated_graphs \
+          docker compose -f docker-compose.yml run --build --rm plotly-dash-app python generate_static_graph.py ${COUNTRIES} --output_dir ${GRAPH_OUTPUT_DIR} \
         "
 
         # Copy generated graph back to runner from the server's host filesystem
-        scp -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST}:${GRAPH_OUTPUT_DIR}/${GRAPH_FILENAME} ./
+        scp -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST}:${GRAPH_OUTPUT_DIR}/*.html ./
 
-    - name: Upload graph artifact
+    - name: Upload all generated graphs artifact
       uses: actions/upload-artifact@v4
       with:
-        name: generated-graph
-        path: country_stats_ru.html
+        name: generated-graphs
+        path: ./*.html # Upload all .html files generated in the current directory
 
   publish-to-pages:
     needs: generate-and-copy-graph
@@ -63,22 +64,22 @@ jobs:
       with:
         ref: add-pages-website # The branch for GitHub Pages
 
-    - name: Download graph artifact
+    - name: Download all generated graphs artifact
       uses: actions/download-artifact@v4
       with:
-        name: generated-graph
+        name: generated-graphs
 
-    - name: Move graph to docs directory
+    - name: Move graphs to docs/graphs directory
       run: |
-        mkdir -p docs
-        mv country_stats_ru.html docs/country_stats_ru.html
+        mkdir -p docs/graphs
+        mv country_stats_*.html docs/graphs/ # Move all generated country stats HTML files
 
     - name: Commit and push changes
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add docs/country_stats_ru.html
-        git commit -m "Update RU country stats graph"
+        git add docs/graphs/
+        git commit -m "Generate and update country stats graphs"
         git push
 
     - name: Deploy to GitHub Pages
