@@ -82,26 +82,31 @@ def generate_graph_for_country(country_code):
     return fig
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate a static Plotly graph for a given country.")
-    parser.add_argument("country_code", type=str, help="The ISO2 country code (e.g., RU, US).")
+    parser = argparse.ArgumentParser(description="Generate static Plotly graphs for specified countries or all.")
+    parser.add_argument("country_codes", nargs='+', help="One or more ISO2 country codes (e.g., RU US), or 'all' to generate for all countries.")
     parser.add_argument("--output_dir", type=str, default="./generated_graphs",
-                        help="Directory to save the generated HTML file.")
+                        help="Directory to save the generated HTML files.")
     args = parser.parse_args()
 
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
 
-    fig = generate_graph_for_country(args.country_code.upper())
-    if fig:
-        output_filename = f"country_stats_{args.country_code.lower()}.html"
-        output_path = os.path.join(output_dir, output_filename)
-        # full_html=True ensures it's a complete HTML document, suitable for iframe embedding.
-        # Plotly graphs are responsive by default within their container.
-        # For embedding in Markdown, you'd typically use an iframe like:
-        # <iframe src="path/to/your/graph.html" width="100%" height="600px" style="border:none;">
-        # </iframe>
-        # You might need to adjust the height or use CSS for more advanced responsiveness.
-        fig.write_html(output_path, auto_open=False, full_html=True)
-        print(f"Graph saved to {output_path}")
+    countries_to_process = []
+    if 'all' in [cc.lower() for cc in args.country_codes]:
+        print("Generating graphs for all countries...")
+        # Fetch all country codes from the database
+        df_all_countries = fetch_data() # This will also populate country_names_ru
+        countries_to_process = list(df_all_countries['cs_country_iso2'].unique())
     else:
-        print("Failed to generate graph.")
+        countries_to_process = [cc.upper() for cc in args.country_codes]
+
+    for country_code in countries_to_process:
+        print(f"Generating graph for {country_code}...")
+        fig = generate_graph_for_country(country_code)
+        if fig:
+            output_filename = f"country_stats_{country_code.lower()}.html"
+            output_path = os.path.join(output_dir, output_filename)
+            fig.write_html(output_path, auto_open=False, full_html=True)
+            print(f"Graph saved to {output_path}")
+        else:
+            print(f"Failed to generate graph for {country_code}.")
