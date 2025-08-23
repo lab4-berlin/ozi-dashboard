@@ -79,7 +79,8 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git add docs/graphs/
-        git commit -m "Generate and update country stats graphs"
+        # Only commit if there are changes, to prevent workflow failures when graphs are identical.
+        git diff-index --quiet HEAD || git commit -m "Generate and update country stats graphs"
         git push
 
     - name: Deploy to GitHub Pages
