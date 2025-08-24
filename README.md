@@ -151,27 +151,17 @@ act pull_request
 
 ## Running Daily STATS_1D Job
 
-The system includes a daily cron job that automatically fetches the latest STATS_1D data. The job:
+The daily STATS_1D ETL job is now scheduled and managed via a GitHub Actions workflow. This workflow automatically fetches the latest STATS_1D data. The job:
 
 1. Determines the last date in the database
 2. Runs the ETL job from that date to today
 3. Prevents duplicate data by only inserting new records
 
-To start the cron service, run:
+The workflow is configured to run daily at 2:00 AM UTC.
 
-```sh
-docker compose up -d ozi-etl-cron
-```
+You can find the workflow definition at `.github/workflows/etl_daily_stats.yml`.
 
-The cron job runs daily at 2:00 AM and logs its output to `etl/logs/daily_stats_1d.log`.
-
-To manually trigger the daily STATS_1D job, you can run:
-
-```sh
-docker compose run --rm --entrypoint="" ozi-etl-cron /app/etl/run_daily_stats_1d.sh
-```
-
-Note: The cron service is separate from the main ETL service to keep the main service lightweight.
+To manually trigger this job, you can navigate to the "Actions" tab in your GitHub repository, select the "ETL Daily Stats" workflow, and click "Run workflow".
 
 ## Stopping Services
 
