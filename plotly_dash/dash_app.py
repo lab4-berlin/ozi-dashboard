@@ -155,15 +155,18 @@ def update_graph_page1(n_intervals, selected_countries):
     fig = px.line(current_df_melted,
                   x='cs_stats_timestamp',
                   y='value',
-                  color='cs_country_iso2',
-                  facet_col='metric',
-                  facet_col_wrap=1,
-                  title='Количественная автономных систем по странам',
-                  labels={'cs_stats_timestamp': 'Дата', 'value': 'ASN', 'cs_country_iso2': 'Country'},
+                  color='cs_country_iso2', # Map countries by color
+                  line_dash='metric', # Differentiate RIS and Stats by line style
+                  title='Количественная автономных систем по странам', # Keep Russian title
+                  labels={'cs_stats_timestamp': 'Дата', 'value': 'ASN', 'cs_country_iso2': 'Страна'}, # Keep Russian labels
                   height=800)
 
-    fig.update_yaxes(matches=None, rangemode="tozero")
-    fig.for_each_annotation(lambda a: a.update(text=a.text.replace("metric=", "")))
+    # Ensure RIS is solid and Stats is dashed (or vice-versa)
+    # Plotly Express automatically assigns dash styles.
+    # To ensure 'ris' is solid, we might need to manually set the dash map if defaults are not as desired.
+    # For now, let's rely on default and see. If not, we can use fig.for_each_trace.
+
+    fig.update_yaxes(rangemode="tozero") # Ensure y-axis starts from 0
     fig.update_layout(hovermode="x unified",
                       legend_itemclick="toggleothers",
                       legend=dict(x=1.02, y=1, xanchor='left', yanchor='top'))
