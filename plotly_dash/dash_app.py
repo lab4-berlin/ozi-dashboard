@@ -83,7 +83,7 @@ def layout_page1_content():
         dropdown_options.append({'label': f"{country_iso}, {russian_name}", 'value': country_iso})
 
     return html.Div([
-        html.H1("Количественная автономных систем по странам"),
+        html.H1("Количество автономных систем по странам"),
         html.Div([
             dcc.Dropdown(
                 id="country-dropdown-page1",
@@ -157,7 +157,7 @@ def update_graph_page1(n_intervals, selected_countries):
                   y='value',
                   color='cs_country_iso2', # Map countries by color
                   line_dash='metric', # Differentiate RIS and Stats by line style
-                  title='Количественная автономных систем по странам', # Keep Russian title
+                  title='Количество автономных систем по странам', # Keep Russian title
                   labels={'cs_stats_timestamp': 'Дата', 'value': 'ASN', 'cs_country_iso2': 'Страна'}, # Keep Russian labels
                   height=800)
 
