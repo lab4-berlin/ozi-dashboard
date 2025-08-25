@@ -140,7 +140,7 @@ You can simulate the GitHub Actions CI workflow locally using `act`. This is use
 
 **Prerequisites for `act`:**
 
-*   `act` installed (e.g., `nix run nixpkgs#act` if you use Nix, or follow `act`'s installation instructions for your OS).
+*   `act` installed, https://github.com/nektos/act.
 *   Docker Engine running on your machine.
 
 To run the `pull_request` workflow defined in `.github/workflows/ci.yml` locally:
@@ -148,6 +148,20 @@ To run the `pull_request` workflow defined in `.github/workflows/ci.yml` locally
 ```sh
 act pull_request
 ```
+
+## Running Daily STATS_1D Job
+
+The daily STATS_1D ETL job is now scheduled and managed via a GitHub Actions workflow. This workflow automatically fetches the latest STATS_1D data. The job:
+
+1. Determines the last date in the database
+2. Runs the ETL job from that date to today
+3. Prevents duplicate data by only inserting new records
+
+The workflow is configured to run daily at 2:00 AM UTC.
+
+You can find the workflow definition at `.github/workflows/etl_daily_stats.yml`.
+
+To manually trigger this job, you can navigate to the "Actions" tab in your GitHub repository, select the "ETL Daily Stats" workflow, and click "Run workflow".
 
 ## Stopping Services
 
