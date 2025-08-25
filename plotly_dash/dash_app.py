@@ -76,21 +76,27 @@ print(df_melted.info())
 
 # Layout for Page 1 (Original Dashboard)
 def layout_page1_content():
+    # Create dropdown options with Russian names
+    dropdown_options = []
+    for country_iso in df['cs_country_iso2'].unique():
+        russian_name = country_names_ru.get(country_iso, country_iso) # Fallback to ISO if Russian name not found
+        dropdown_options.append({'label': f"{country_iso}, {russian_name}", 'value': country_iso})
+
     return html.Div([
-        html.H1("Country Statistics Time Series - Page 1"),
+        html.H1("Количественная автономных систем по странам"),
         html.Div([
             dcc.Dropdown(
-                id='country-dropdown-page1',
-                options=[{'label': country, 'value': country} for country in df['cs_country_iso2'].unique()],
-                value=random.sample(df['cs_country_iso2'].unique().tolist(), min(5, len(df['cs_country_iso2'].unique()))),
+                id="country-dropdown-page1",
+                options=dropdown_options,
+                value=["RU"],
                 multi=True,
-                placeholder="Select countries",
+                placeholder="Выберите страну",
                 closeOnSelect=False,
             )
-        ], style={'width': '50%', 'padding': '20px'}),
-        dcc.Graph(id='time-series-graph-page1'),
+        ], style={"width": "50%", "padding": "20px"}),
+        dcc.Graph(id="time-series-graph-page1"),
         dcc.Interval(
-            id='interval-component-page1',
+            id="interval-component-page1",
             interval=5*60*1000,
             n_intervals=0
         )
@@ -152,8 +158,8 @@ def update_graph_page1(n_intervals, selected_countries):
                   color='cs_country_iso2',
                   facet_col='metric',
                   facet_col_wrap=1,
-                  title='Country Statistics Over Time - Page 1',
-                  labels={'cs_stats_timestamp': 'Date', 'value': 'Value', 'cs_country_iso2': 'Country'},
+                  title='Количественная автономных систем по странам',
+                  labels={'cs_stats_timestamp': 'Дата', 'value': 'ASN', 'cs_country_iso2': 'Country'},
                   height=800)
 
     fig.update_yaxes(matches=None, rangemode="tozero")
