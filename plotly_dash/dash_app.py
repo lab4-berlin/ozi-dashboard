@@ -156,7 +156,7 @@ def update_graph_page1(n_intervals, selected_countries):
                   labels={'cs_stats_timestamp': 'Date', 'value': 'Value', 'cs_country_iso2': 'Country'},
                   height=800)
 
-    fig.update_yaxes(matches=None)
+    fig.update_yaxes(matches=None, rangemode="tozero")
     fig.for_each_annotation(lambda a: a.update(text=a.text.replace("metric=", "")))
     fig.update_layout(hovermode="x unified",
                       legend_itemclick="toggleothers",
@@ -190,7 +190,8 @@ def update_graph_page2(n_intervals, selected_country): # Changed argument name
 
     fig.update_layout(hovermode="x unified",
                       legend_itemclick="toggleothers",
-                      legend=dict(x=0.01, y=0.99, xanchor='left', yanchor='top', bgcolor='rgba(255,255,255,0.5)'))
+                      legend=dict(x=0.01, y=0.99, xanchor='left', yanchor='top', bgcolor='rgba(255,255,255,0.5)'),
+                      yaxis_rangemode="tozero")
 
     return fig
 
