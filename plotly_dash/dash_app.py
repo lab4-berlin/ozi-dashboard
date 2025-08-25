@@ -126,11 +126,7 @@ def layout_page2_content():
 
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
-    html.Div([
-        dcc.Link('Go to Page 1', href='/page1', style={'marginRight': '10px'}),
-        dcc.Link('Go to Page 2', href='/page2'),
-        html.Span(' (e.g., /page2/US)', style={'fontSize': '0.8em', 'color': '#888'}),
-    ], style={'padding': '20px'}),
+    
     html.Div(id='page-1-container', children=layout_page1_content(), style={'display': 'none'}),
     html.Div(id='page-2-container', children=layout_page2_content(), style={'display': 'none'}),
 ])
