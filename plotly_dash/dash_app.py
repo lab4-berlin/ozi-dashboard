@@ -64,6 +64,11 @@ def fetch_data():
 app = dash.Dash(__name__)
 app.suppress_callback_exceptions = True
 
+@app.server.after_request
+def add_security_headers(response):
+    response.headers['X-Frame-Options'] = 'ALLOW-FROM https://ozi-ru.net'
+    return response
+
 df = fetch_data()
 
 # Melt the DataFrame to long format for easier plotting of multiple metrics
@@ -236,4 +241,4 @@ def set_dropdown_value_from_url(pathname):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8050, debug=True)
+    app.run(host="0.0.0.0", port=8050, debug=False)
