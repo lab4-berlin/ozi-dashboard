@@ -99,6 +99,7 @@ def layout_page1_content():
                 multi=False,
                 placeholder="Select a country",
                 closeOnSelect=True,
+                clearable=False, # Prevent deselection
             )
         ], style={"width": "50%", "padding": "20px"}),
         html.Div([
