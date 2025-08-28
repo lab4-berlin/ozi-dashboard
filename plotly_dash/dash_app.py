@@ -102,7 +102,7 @@ def layout_page1_content():
         ], style={"width": "50%", "padding": "20px"}),
         html.Div([
             dcc.Graph(id="time-series-graph-page1", style={'height': '100%'})
-        ], style={'flexGrow': '1', 'height': '100%'}), # Use flexGrow and 100% height
+        ], style={'flexGrow': '1', 'height': 'calc(100vh - 120px)'}), # Use flexGrow and 100% height, adjusted for header/footer if any
         dcc.Interval(
             id="interval-component-page1",
             interval=5*60*1000,
