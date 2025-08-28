@@ -163,7 +163,6 @@ def update_graph_page1(n_intervals, selected_country):
                   y='value',
                   color='metric', # Color by metric to differentiate lines
                   labels={'cs_stats_timestamp': '', 'value': 'Number of Autonomous Systems (ASN)', 'metric': 'Metric'},
-                  height=800, # Revert height for single plot
                   template='plotly_white') # Use a light but contrasting style
 
     fig.for_each_trace(lambda t: t.update(name = t.name.replace("cs_asns_ris", "ASN RIS").replace("cs_asns_stats", "ASN Stat")))
