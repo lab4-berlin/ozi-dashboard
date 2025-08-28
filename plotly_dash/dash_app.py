@@ -100,7 +100,9 @@ def layout_page1_content():
                 closeOnSelect=True,
             )
         ], style={"width": "50%", "padding": "20px"}),
-        dcc.Graph(id="time-series-graph-page1"),
+        html.Div([
+            dcc.Graph(id="time-series-graph-page1", style={'height': '100%'})
+        ], style={'flexGrow': '1', 'height': '100%'}), # Use flexGrow and 100% height
         dcc.Interval(
             id="interval-component-page1",
             interval=5*60*1000,
