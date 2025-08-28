@@ -172,7 +172,7 @@ def update_graph_page1(n_intervals, selected_country):
     fig.update_yaxes(rangemode="tozero") # Ensure y-axis starts from 0
     fig.update_layout(hovermode="x unified",
                       legend_itemclick="toggleothers",
-                      legend=dict(x=1.02, y=1, xanchor='left', yanchor='top'))
+                      legend=dict(x=0.01, y=0.99, xanchor='left', yanchor='top'))
 
     return fig
 
