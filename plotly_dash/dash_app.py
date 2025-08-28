@@ -88,6 +88,7 @@ def layout_page1_content():
     for country_iso in df['cs_country_iso2'].unique():
         english_name = country_names_en.get(country_iso, country_iso) # Fallback to ISO if English name not found
         dropdown_options.append({'label': f"{country_iso}, {english_name}", 'value': country_iso})
+    dropdown_options = sorted(dropdown_options, key=lambda k: k['label'])
 
     return html.Div([
         html.Div([
@@ -117,6 +118,7 @@ def layout_page2_content():
     for country_iso in df['cs_country_iso2'].unique():
         russian_name = country_names_ru.get(country_iso, country_iso) # Fallback to ISO if Russian name not found
         dropdown_options.append({'label': f"{country_iso}, {russian_name}", 'value': country_iso})
+    dropdown_options = sorted(dropdown_options, key=lambda k: k['label'])
 
     return html.Div([
         html.H1(f"Country Statistics Time Series - Page 2"),
