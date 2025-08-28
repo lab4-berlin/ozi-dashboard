@@ -79,6 +79,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro # Mount directory for SSL certificates
+      - certbot_webroot:/var/www/certbot # Add this line for Certbot challenges
     depends_on:
       - plotly-dash-app
     networks:
@@ -154,6 +155,7 @@ services:
 
 volumes:
   pgdata:
+  certbot_webroot: # Define the new named volume
 
 networks:
   ozi_network:
