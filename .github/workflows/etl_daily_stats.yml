@@ -1,0 +1,46 @@
+name: ETL Daily Stats
+
+on:
+  schedule:
+    # Run daily at 2:00 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  run-daily-stats:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Add SSH Host Key
+      env:
+        SSH_HOST: ${{ vars.SSH_HOST }}
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${SSH_HOST} >> ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+
+    - name: Run ETL on Server
+      env:
+        SSH_USER: ${{ vars.SSH_USER }}
+        SSH_HOST: ${{ vars.SSH_HOST }}
+        PROJECT_DIR: /opt/ozi-dashboard
+      run: |
+        ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} " 
+          cd ${PROJECT_DIR} && 
+          DATE_RANGE_OUTPUT=$(docker compose exec ozi-etl python3 etl/get_stats_1d_date_range.py) && 
+          if echo "$DATE_RANGE_OUTPUT" | grep -q "Nothing to do"; then 
+            echo "No new data to process. Exiting ETL." ; 
+          else 
+            DATE_ARGS=$(echo "$DATE_RANGE_OUTPUT" | grep -oP '--date-from \S+ --date-to \S+') && 
+            echo "Running ETL job with parameters: $DATE_ARGS" && 
+            docker compose exec ozi-etl python3 etl/main.py -t STATS_1D -c "all" $DATE_ARGS -dr D ; 
+          fi 
+        "

@@ -49,6 +49,8 @@ services:
     networks:
       - ozi_network
 
+  
+
   plotly-dash-app:
     build:
       context: ./plotly_dash
