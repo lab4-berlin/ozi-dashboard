@@ -39,11 +39,6 @@ services:
     mem_limit: 2g
     environment:
       PYTHONPATH: /app
-      DB_HOST: ozi-postgres
-      DB_PORT: 5432
-      DB_NAME: ${POSTGRES_DB:-ozi_db2}
-      DB_USER: ${POSTGRES_OZI_USER:-ozi}
-      DB_PASS: ${POSTGRES_OZI_PASSWORD:-ozi_password}
       OZI_DATABASE_HOST:     ozi-postgres
       OZI_DATABASE_PORT:     5432
       OZI_DATABASE_NAME:     ${POSTGRES_DB:-ozi_db2}
@@ -71,11 +66,24 @@ services:
       DASH_DB_HOST: ozi-postgres
       DASH_DB_PORT: 5432
       DASH_DB_NAME: ${POSTGRES_DB:-ozi_db2}
-      
-    ports:
-      - "8050:8050"
     volumes:
       - ./generated_graphs:/app/generated_graphs
+    networks:
+      - ozi_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: ozi_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certbot_etc:/etc/letsencrypt:ro # Mount Certbot configuration and certificates
+      - certbot_webroot:/var/www/certbot # Add this line for Certbot challenges
+    depends_on:
+      - plotly-dash-app
     networks:
       - ozi_network
 
@@ -149,6 +157,7 @@ services:
 
 volumes:
   pgdata:
+  certbot_webroot: # Define the new named volume
 
 networks:
   ozi_network:

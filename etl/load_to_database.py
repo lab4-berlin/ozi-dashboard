@@ -19,7 +19,7 @@ def get_db_connection():
         connection_string = f"postgresql://{USER}:{encoded_password}@{HOST}:{PORT}/{DBNAME}"
     else:
         connection_string = f"postgresql://{USER}@{HOST}:{PORT}/{DBNAME}"
-    # print(connection_string)
+
     engine = create_engine(connection_string)
     return engine.connect()
 
@@ -62,10 +62,10 @@ def insert_country_asns_to_db(country_iso2, list_of_asns, save_sql_to_file=False
             print(sql, file=f)
 
     if load_to_database:
-        query = text(sql)
-        c.execute(query)
-        c.commit()
-    c.close()
+        with get_db_connection() as c:
+            query = text(sql)
+            c.execute(query)
+            c.commit()
 
 
 def insert_country_stats_to_db(country_iso2, resolution, stats, save_sql_to_file=False, load_to_database=True):
@@ -137,12 +137,12 @@ def insert_country_stats_to_db(country_iso2, resolution, stats, save_sql_to_file
 
 
     if load_to_database:
-        query = text(sql)
-        c.execute(query)
-        c.commit()
-    c.close()
+        with get_db_connection() as c:
+            query = text(sql)
+            c.execute(query)
+            c.commit()
 
-
+            
 def insert_country_asn_neighbours_to_db(country_iso2, neighbours, save_sql_to_file=False, load_to_database=True):
     if not neighbours:
         return
@@ -181,11 +181,12 @@ def insert_country_asn_neighbours_to_db(country_iso2, neighbours, save_sql_to_fi
             print(sql, file=f)
 
     if load_to_database:
-        query = text(sql)
-        c.execute(query)
-        c.commit()
-    c.close()
+        with get_db_connection() as c:
+            query = text(sql)
+            c.execute(query)
+            c.commit()
 
+            
 def insert_traffic_for_country_to_db(country_iso2, traffic, save_sql_to_file=False, load_to_database=True):
     if not traffic or not traffic['timestamps']:
         return
@@ -204,6 +205,7 @@ def insert_traffic_for_country_to_db(country_iso2, traffic, save_sql_to_file=Fal
     existing_traffic_set = set(date.strftime('%Y-%m-%d %H:%M:%S+00:00') for date, in existing_traffic_result)
 
     new_traffic_to_insert = []
+
     for timestamp, value in zip(traffic['timestamps'], traffic['values']):
         try:
             item_timestamp_dt = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%SZ')
@@ -231,10 +233,11 @@ def insert_traffic_for_country_to_db(country_iso2, traffic, save_sql_to_file=Fal
             print(sql, file=f)
 
     if load_to_database:
-        query = text(sql)
-        c.execute(query)
-        c.commit()
-    c.close()
+        with get_db_connection() as c:
+            query = text(sql)
+            c.execute(query)
+            c.commit()
+
 
 def insert_internet_quality_for_country_to_db(country_iso2, internet_quality, save_sql_to_file=False, load_to_database=True):
     if not internet_quality or not internet_quality['timestamps']:
@@ -254,6 +257,7 @@ def insert_internet_quality_for_country_to_db(country_iso2, internet_quality, sa
     existing_quality_set = set(date.strftime('%Y-%m-%d %H:%M:%S+00:00') for date, in existing_quality_result)
 
     new_quality_to_insert = []
+
     for timestamp, p75, p50, p25 in (
             zip(internet_quality['timestamps'], internet_quality['p75'], internet_quality['p50'], internet_quality['p25'])):
         try:
@@ -283,7 +287,7 @@ def insert_internet_quality_for_country_to_db(country_iso2, internet_quality, sa
             print(sql, file=f)
 
     if load_to_database:
-        query = text(sql)
-        c.execute(query)
-        c.commit()
-    c.close()
+        with get_db_connection() as c:
+            query = text(sql)
+            c.execute(query)
+            c.commit()

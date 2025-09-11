@@ -36,7 +36,7 @@ jobs:
         # Execute script on remote server using docker compose run
         ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "\
           cd ${REMOTE_PROJECT_PATH} && \
-          docker compose -f docker-compose.yml run --build --rm plotly-dash-app python generate_static_graph.py ${COUNTRIES} --output_dir ${GRAPH_OUTPUT_DIR} \
+          docker compose -f docker-compose.yml run --build --rm plotly-dash-app python generate_static_graph.py ${COUNTRIES} --output_dir ${GRAPH_OUTPUT_DIR}
         "
 
         # Copy generated graph back to runner from the server's host filesystem
@@ -55,9 +55,7 @@ jobs:
       pages: write
       id-token: write
       contents: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    
     steps:
     - name: Checkout add-pages-website branch
       uses: actions/checkout@v4
@@ -82,7 +80,3 @@ jobs:
         # Only commit if there are changes, to prevent workflow failures when graphs are identical.
         git diff-index --quiet HEAD || git commit -m "Generate and update country stats graphs"
         git push
-
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4

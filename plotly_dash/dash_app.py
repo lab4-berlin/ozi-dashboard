@@ -11,10 +11,11 @@ import random
 last_data_fetch_time = None
 cached_df = None
 country_names_ru = {}
+country_names_en = {}
 CACHE_TTL_SECONDS = 60 # Cache will be considered stale after 60 seconds
 
 def fetch_data():
-    global last_data_fetch_time, cached_df, country_names_ru
+    global last_data_fetch_time, cached_df, country_names_ru, country_names_en
 
     # Check if cached data is still fresh
     if cached_df is not None and last_data_fetch_time is not None and \
@@ -42,13 +43,14 @@ def fetch_data():
              ORDER BY cs_stats_timestamp;"""
     df = pd.read_sql(query_stats, engine)
 
-    # Fetch country names in Russian
-    query_countries = "SELECT c_iso2, c_name_ru FROM data.country;"
+    # Fetch country names in Russian and English
+    query_countries = "SELECT c_iso2, c_name_ru, c_name FROM data.country;"
     df_countries = pd.read_sql(query_countries, engine)
     engine.dispose()
 
-    # Populate country_names_ru dictionary
+    # Populate country_names_ru and country_names_en dictionaries
     country_names_ru = {row['c_iso2']: row['c_name_ru'] for index, row in df_countries.iterrows()}
+    country_names_en = {row['c_iso2']: row['c_name'] for index, row in df_countries.iterrows()}
 
     # Update cache and timestamp
     cached_df = df
@@ -61,6 +63,11 @@ def fetch_data():
 
 app = dash.Dash(__name__)
 app.suppress_callback_exceptions = True
+
+@app.server.after_request
+def add_security_headers(response):
+    response.headers['X-Frame-Options'] = 'ALLOW-FROM https://ozi-ru.net'
+    return response
 
 df = fetch_data()
 
@@ -76,21 +83,30 @@ print(df_melted.info())
 
 # Layout for Page 1 (Original Dashboard)
 def layout_page1_content():
+    # Create dropdown options with English names
+    dropdown_options = []
+    for country_iso in df['cs_country_iso2'].unique():
+        english_name = country_names_en.get(country_iso, country_iso) # Fallback to ISO if English name not found
+        dropdown_options.append({'label': f"{country_iso}, {english_name}", 'value': country_iso})
+    dropdown_options = sorted(dropdown_options, key=lambda k: k['label'])
+
     return html.Div([
-        html.H1("Country Statistics Time Series - Page 1"),
         html.Div([
             dcc.Dropdown(
-                id='country-dropdown-page1',
-                options=[{'label': country, 'value': country} for country in df['cs_country_iso2'].unique()],
-                value=random.sample(df['cs_country_iso2'].unique().tolist(), min(5, len(df['cs_country_iso2'].unique()))),
-                multi=True,
-                placeholder="Select countries",
-                closeOnSelect=False,
+                id="country-dropdown-page1",
+                options=dropdown_options,
+                value="RU",
+                multi=False,
+                placeholder="Select a country",
+                closeOnSelect=True,
+                clearable=False, # Prevent deselection
             )
-        ], style={'width': '50%', 'padding': '20px'}),
-        dcc.Graph(id='time-series-graph-page1'),
+        ], style={"width": "50%", "padding": "20px"}),
+        html.Div([
+            dcc.Graph(id="time-series-graph-page1", style={'height': '100%'})
+        ], style={'flexGrow': '1', 'height': 'calc(100vh - 120px)'}), # Use flexGrow and 100% height, adjusted for header/footer if any
         dcc.Interval(
-            id='interval-component-page1',
+            id="interval-component-page1",
             interval=5*60*1000,
             n_intervals=0
         )
@@ -103,6 +119,7 @@ def layout_page2_content():
     for country_iso in df['cs_country_iso2'].unique():
         russian_name = country_names_ru.get(country_iso, country_iso) # Fallback to ISO if Russian name not found
         dropdown_options.append({'label': f"{country_iso}, {russian_name}", 'value': country_iso})
+    dropdown_options = sorted(dropdown_options, key=lambda k: k['label'])
 
     return html.Div([
         html.H1(f"Country Statistics Time Series - Page 2"),
@@ -126,11 +143,7 @@ def layout_page2_content():
 
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
-    html.Div([
-        dcc.Link('Go to Page 1', href='/page1', style={'marginRight': '10px'}),
-        dcc.Link('Go to Page 2', href='/page2'),
-        html.Span(' (e.g., /page2/US)', style={'fontSize': '0.8em', 'color': '#888'}),
-    ], style={'padding': '20px'}),
+    
     html.Div(id='page-1-container', children=layout_page1_content(), style={'display': 'none'}),
     html.Div(id='page-2-container', children=layout_page2_content(), style={'display': 'none'}),
 ])
@@ -141,30 +154,29 @@ app.layout = html.Div([
     Input('interval-component-page1', 'n_intervals'),
     Input('country-dropdown-page1', 'value')
 )
-def update_graph_page1(n_intervals, selected_countries):
+def update_graph_page1(n_intervals, selected_country):
     current_df = fetch_data()
     current_df_melted = current_df.melt(id_vars=['cs_country_iso2', 'cs_stats_timestamp'],
                                         value_vars=['cs_asns_ris', 'cs_asns_stats'],
                                         var_name='metric', value_name='value')
 
-    if selected_countries:
-        current_df_melted = current_df_melted[current_df_melted['cs_country_iso2'].isin(selected_countries)]
+    if selected_country:
+        current_df_melted = current_df_melted[current_df_melted['cs_country_iso2'] == selected_country]
 
     fig = px.line(current_df_melted,
                   x='cs_stats_timestamp',
                   y='value',
-                  color='cs_country_iso2',
-                  facet_col='metric',
-                  facet_col_wrap=1,
-                  title='Country Statistics Over Time - Page 1',
-                  labels={'cs_stats_timestamp': 'Date', 'value': 'Value', 'cs_country_iso2': 'Country'},
-                  height=800)
+                  color='metric', # Color by metric to differentiate lines
+                  labels={'cs_stats_timestamp': '', 'value': 'Number of Autonomous Systems (ASN)', 'metric': 'Metric'},
+                  template='plotly_white') # Use a light but contrasting style
 
-    fig.update_yaxes(matches=None)
-    fig.for_each_annotation(lambda a: a.update(text=a.text.replace("metric=", "")))
+    fig.for_each_trace(lambda t: t.update(name = t.name.replace("cs_asns_ris", "ASN RIS").replace("cs_asns_stats", "ASN Stat")))
+    fig.update_traces(line=dict(width=3)) # Make lines thicker
+
+    fig.update_yaxes(rangemode="tozero") # Ensure y-axis starts from 0
     fig.update_layout(hovermode="x unified",
                       legend_itemclick="toggleothers",
-                      legend=dict(x=1.02, y=1, xanchor='left', yanchor='top'))
+                      legend=dict(x=0.5, y=1.05, xanchor='center', yanchor='bottom', orientation='h', title_text=''))
 
     return fig
 
@@ -194,7 +206,8 @@ def update_graph_page2(n_intervals, selected_country): # Changed argument name
 
     fig.update_layout(hovermode="x unified",
                       legend_itemclick="toggleothers",
-                      legend=dict(x=0.01, y=0.99, xanchor='left', yanchor='top', bgcolor='rgba(255,255,255,0.5)'))
+                      legend=dict(x=0.01, y=0.99, xanchor='left', yanchor='top', bgcolor='rgba(255,255,255,0.5)'),
+                      yaxis_rangemode="tozero")
 
     return fig
 
@@ -232,4 +245,4 @@ def set_dropdown_value_from_url(pathname):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8050, debug=True)
+    app.run(host="0.0.0.0", port=8050, debug=False)

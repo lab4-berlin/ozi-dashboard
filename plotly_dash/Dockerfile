@@ -5,4 +5,4 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY dash_app.py .
 COPY generate_static_graph.py .
-CMD ["python", "dash_app.py"]
+CMD ["gunicorn", "dash_app:app", "-b", "0.0.0.0:8050", "--workers", "2"]

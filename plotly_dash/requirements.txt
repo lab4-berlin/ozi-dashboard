@@ -1,5 +1,6 @@
 dash
-pandas
 plotly
+pandas
 sqlalchemy
 psycopg2-binary
+gunicorn
