@@ -9,6 +9,7 @@ on:
 jobs:
   run-daily-stats:
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
     - name: Checkout repository
