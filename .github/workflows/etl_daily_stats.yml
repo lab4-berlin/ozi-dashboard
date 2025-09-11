@@ -34,14 +34,4 @@ jobs:
         SSH_HOST: ${{ vars.SSH_HOST }}
         PROJECT_DIR: /opt/ozi-dashboard
       run: |
-        ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} "\
-          cd ${PROJECT_DIR} && \
-          DATE_RANGE_OUTPUT=$(docker compose exec ozi-etl python3 etl/get_stats_1d_date_range.py) && \
-          if echo \"$DATE_RANGE_OUTPUT\" | grep -q \"Nothing to do\"; then \
-            echo \"No new data to process. Exiting ETL.\" ; \
-          else \
-            DATE_ARGS=$(echo \"$DATE_RANGE_OUTPUT\" | grep -oP '--date-from \S+ --date-to \S+') && \
-            echo \"Running ETL job with parameters: $DATE_ARGS\" && \
-            docker compose exec ozi-etl python3 etl/main.py -t STATS_1D -c \"all\" $DATE_ARGS -dr D ; \
-          fi \
-        "
+        run: ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} 'bash -c "set -x; cd ${PROJECT_DIR} && DATE_RANGE_OUTPUT=$(docker compose exec ozi-etl python3 etl/get_stats_1d_date_range.py) && if echo \"$DATE_RANGE_OUTPUT\" | grep -q \"Nothing to do\"; then echo \"No new data to process. Exiting ETL.\" ; else DATE_ARGS=$(echo \"$DATE_RANGE_OUTPUT\" | grep -oP \"--date-from \\S+ --date-to \\S+\") && echo \"Running ETL job with parameters: $DATE_ARGS\" && docker compose exec ozi-etl python3 etl/main.py -t STATS_1D -c \"all\" $DATE_ARGS -dr D ; fi"'
