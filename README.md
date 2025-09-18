@@ -115,7 +115,7 @@ The ETL service can be used to run specific jobs by passing command-line argumen
 Here is an example of how to run the `ASN_NEIGHBOURS` task for the Czech Republic for May 2025:
 
 ```sh
-docker compose run ozi-etl -t ASN_NEIGHBOURS -c CZ -df 2025-05-01 -dt 2025-05-31 -dr D
+docker compose run ozi-etl python3 etl/main.py -t ASN_NEIGHBOURS -c CZ -df 2025-05-01 -dt 2025-05-31 -dr D
 ```
 
 ## Running Tests

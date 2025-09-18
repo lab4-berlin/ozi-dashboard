@@ -18,8 +18,3 @@ RUN mkdir -p /app/etl/logs
 # Ensure the run script within etl is executable (if it's used by the python code)
 # Although our primary CMD is different, this maintains its executable state if needed.
 RUN chmod +x /app/etl/run.sh
-
-# The main command to run the application
-# The specific job YAML file (e.g., etl/jobs/load_asns_report_May25.yaml)
-# will need to be appended as an argument when running the container.
-ENTRYPOINT ["python3", "./etl/main.py"]
