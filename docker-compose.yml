@@ -39,11 +39,7 @@ services:
     mem_limit: 2g
     environment:
       PYTHONPATH: /app
-      OZI_DATABASE_HOST:     ozi-postgres
-      OZI_DATABASE_PORT:     5432
-      OZI_DATABASE_NAME:     ${POSTGRES_DB:-ozi_db2}
-      OZI_DATABASE_USER:     ${POSTGRES_OZI_USER:-ozi}
-      OZI_DATABASE_PASSWORD: ${POSTGRES_OZI_PASSWORD:-ozi_password}
+      POSTGRES_HOST: ozi-postgres
     volumes:
       - ./etl/logs:/app/etl/logs
     networks:

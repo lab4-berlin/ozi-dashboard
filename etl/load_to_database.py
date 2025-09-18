@@ -5,11 +5,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.sql.functions import current_date
 from sqlalchemy import text
 
-USER = os.getenv("OZI_DATABASE_USER", "ozi")
-PASSWORD = os.getenv("OZI_DATABASE_PASSWORD", "ozi_password")
-DBNAME = os.getenv("OZI_DATABASE_NAME", "ozi_db2")
-PORT = os.getenv("OZI_DATABASE_PORT", "5432")
-HOST = os.getenv("OZI_DATABASE_HOST", "ozi-postgres")
+HOST = os.getenv("POSTGRES_HOST", "ozi-postgres")
+PORT = os.getenv("POSTGRES_PORT", "5432")
+USER = os.getenv("POSTGRES_OZI_USER", "ozi")
+PASSWORD = os.getenv("POSTGRES_OZI_PASSWORD", "ozi_password")
+DBNAME = os.getenv("POSTGRES_DB", "ozi_db2")
 
 BATCH_SIZE = 1000
 
