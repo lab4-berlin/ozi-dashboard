@@ -6,8 +6,9 @@ from datetime import datetime
 from json import loads
 import requests
 
-API_URL = 'https://stat.ripe.net/data/{}/data.json'
+API_URL = "https://stat.ripe.net/data/{}/data.json"
 RETRIES = 5
+
 
 def get_country_asns(country_iso2, date, save_mode=None):
     url = API_URL.format("country-asns")
@@ -20,13 +21,13 @@ def get_country_asns(country_iso2, date, save_mode=None):
 
 
 def get_country_resource_stats(country_iso2, resolution, date, save_mode=None):
-    date_str = date.isoformat() 
+    date_str = date.isoformat()
     url = API_URL.format("country-resource-stats")
     params = {
         "resource": country_iso2,
         "starttime": date_str,
         "endtime": date_str,
-        "resolution": resolution
+        "resolution": resolution,
     }
     data = ripe_api_call(url, params)
 
@@ -58,20 +59,22 @@ def ripe_api_call(url, params):
             print(f"\nHTTP Error during API request: {e}")
             attempts_left -= 1
             if attempts_left > 0:
-                if e.response.status_code == 429: # Too Many Requests
+                if e.response.status_code == 429:  # Too Many Requests
                     print("Rate limit hit. Waiting longer before retrying.")
-                    time.sleep(10) # Wait longer for rate limiting
+                    time.sleep(10)  # Wait longer for rate limiting
                 else:
                     print(f"... RETRYING ({attempts_left} attempts left)")
-                    time.sleep(5) # Standard wait for other HTTP errors
+                    time.sleep(5)  # Standard wait for other HTTP errors
             else:
                 print("... STOP")
         except json.JSONDecodeError:
-            print(f"\nJSON Decode Error: Could not parse response as JSON for URL: {url} with params: {params}")
+            print(
+                f"\nJSON Decode Error: Could not parse response as JSON for URL: {url} with params: {params}"
+            )
             attempts_left -= 1
             if attempts_left > 0:
                 print(f"... RETRYING ({attempts_left} attempts left)")
-                time.sleep(5) # Wait before retrying for JSON decode errors
+                time.sleep(5)  # Wait before retrying for JSON decode errors
             else:
                 print("... STOP")
         except Exception as e:
@@ -79,29 +82,31 @@ def ripe_api_call(url, params):
             attempts_left -= 1
             if attempts_left > 0:
                 print(f"... RETRYING ({attempts_left} attempts left)")
-                time.sleep(5) # Wait for 5 seconds before retrying on other exceptions
+                time.sleep(5)  # Wait for 5 seconds before retrying on other exceptions
             else:
                 print("... STOP")
     return None
 
+
 def sanitize_filename(s: str) -> str:
-    return re.sub(r'[{},.<>:"/\\|?*]', '_', s)
+    return re.sub(r'[{},.<>:"/\\|?*]', "_", s)
+
 
 def save_api_response(url, params, response, save_mode=None):
-    if save_mode == 'file':
+    if save_mode == "file":
         params_clean = {
             k: v.isoformat() if isinstance(v, datetime) else v
             for k, v in params.items()
         }
 
         params_string = json.dumps(params_clean, separators=(",", ":"))
-        safe_string = sanitize_filename(f'{url}{params_string}')
+        safe_string = sanitize_filename(f"{url}{params_string}")
 
         folder = "data"
         os.makedirs(folder, exist_ok=True)
 
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         filename = f"{folder}/ripe_response_{timestamp}_{safe_string}.json"
 
-        with open(filename, 'w', encoding='utf-8') as f:
+        with open(filename, "w", encoding="utf-8") as f:
             json.dump(response, f, ensure_ascii=False, indent=2)

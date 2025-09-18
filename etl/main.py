@@ -175,7 +175,8 @@ def etl_load_internet_quality(iso2, dates, save_to_file=False):
     internet_quality = get_internet_quality_for_country(iso2, CLOUDFLARE_API_TOKEN)
     if internet_quality:
         insert_internet_quality_for_country_to_db(
-            iso2, internet_quality, save_sql_to_file=save_to_file)
+            iso2, internet_quality, save_sql_to_file=save_to_file
+        )
 
 
 if __name__ == "__main__":

@@ -9,14 +9,18 @@ import argparse
 last_data_fetch_time = None
 cached_df = None
 country_names_ru = {}
-CACHE_TTL_SECONDS = 60 # Cache will be considered stale after 60 seconds
+CACHE_TTL_SECONDS = 60  # Cache will be considered stale after 60 seconds
+
 
 def fetch_data():
     global last_data_fetch_time, cached_df, country_names_ru
 
     # Check if cached data is still fresh
-    if cached_df is not None and last_data_fetch_time is not None and \
-       (datetime.now() - last_data_fetch_time).total_seconds() < CACHE_TTL_SECONDS:
+    if (
+        cached_df is not None
+        and last_data_fetch_time is not None
+        and (datetime.now() - last_data_fetch_time).total_seconds() < CACHE_TTL_SECONDS
+    ):
         print("Serving data from cache.")
         return cached_df
 
@@ -46,7 +50,9 @@ def fetch_data():
     engine.dispose()
 
     # Populate country_names_ru dictionary
-    country_names_ru = {row['c_iso2']: row['c_name_ru'] for index, row in df_countries.iterrows()}
+    country_names_ru = {
+        row["c_iso2"]: row["c_name_ru"] for index, row in df_countries.iterrows()
+    }
 
     # Update cache and timestamp
     cached_df = df
@@ -54,49 +60,78 @@ def fetch_data():
 
     return df
 
+
 def generate_graph_for_country(country_code):
     df = fetch_data()
 
-    df_melted = df.melt(id_vars=['cs_country_iso2', 'cs_stats_timestamp'],
-                        value_vars=['cs_asns_ris', 'cs_asns_stats'],
-                        var_name='metric', value_name='value')
+    df_melted = df.melt(
+        id_vars=["cs_country_iso2", "cs_stats_timestamp"],
+        value_vars=["cs_asns_ris", "cs_asns_stats"],
+        var_name="metric",
+        value_name="value",
+    )
 
     if country_code:
-        df_melted = df_melted[df_melted['cs_country_iso2'] == country_code]
+        df_melted = df_melted[df_melted["cs_country_iso2"] == country_code]
     else:
         print("No country code provided. Cannot generate graph.")
         return None
 
-    fig = px.line(df_melted,
-                  x='cs_stats_timestamp',
-                  y='value',
-                  color='metric',
-                  line_dash='metric',
-                  title=f'Country Statistics Over Time ({country_code}) - ASNs RIS vs Stats',
-                  labels={'cs_stats_timestamp': 'Date', 'value': 'Value', 'cs_country_iso2': 'Country'},
-                  height=600)
+    fig = px.line(
+        df_melted,
+        x="cs_stats_timestamp",
+        y="value",
+        color="metric",
+        line_dash="metric",
+        title=f"Country Statistics Over Time ({country_code}) - ASNs RIS vs Stats",
+        labels={
+            "cs_stats_timestamp": "Date",
+            "value": "Value",
+            "cs_country_iso2": "Country",
+        },
+        height=600,
+    )
 
-    fig.update_layout(hovermode="x unified",
-                      legend_itemclick="toggleothers",
-                      legend=dict(x=0.01, y=0.99, xanchor='left', yanchor='top', bgcolor='rgba(255,255,255,0.5)'))
+    fig.update_layout(
+        hovermode="x unified",
+        legend_itemclick="toggleothers",
+        legend=dict(
+            x=0.01,
+            y=0.99,
+            xanchor="left",
+            yanchor="top",
+            bgcolor="rgba(255,255,255,0.5)",
+        ),
+    )
     return fig
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate static Plotly graphs for specified countries or all.")
-    parser.add_argument("country_codes", nargs='+', help="One or more ISO2 country codes (e.g., RU US), or 'all' to generate for all countries.")
-    parser.add_argument("--output_dir", type=str, default="./generated_graphs",
-                        help="Directory to save the generated HTML files.")
+    parser = argparse.ArgumentParser(
+        description="Generate static Plotly graphs for specified countries or all."
+    )
+    parser.add_argument(
+        "country_codes",
+        nargs="+",
+        help="One or more ISO2 country codes (e.g., RU US), or 'all' to generate for all countries.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default="./generated_graphs",
+        help="Directory to save the generated HTML files.",
+    )
     args = parser.parse_args()
 
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
 
     countries_to_process = []
-    if 'all' in [cc.lower() for cc in args.country_codes]:
+    if "all" in [cc.lower() for cc in args.country_codes]:
         print("Generating graphs for all countries...")
         # Fetch all country codes from the database
-        df_all_countries = fetch_data() # This will also populate country_names_ru
-        countries_to_process = list(df_all_countries['cs_country_iso2'].unique())
+        df_all_countries = fetch_data()  # This will also populate country_names_ru
+        countries_to_process = list(df_all_countries["cs_country_iso2"].unique())
     else:
         countries_to_process = [cc.upper() for cc in args.country_codes]
 

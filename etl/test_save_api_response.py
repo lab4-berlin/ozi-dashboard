@@ -28,9 +28,9 @@ def test_save_api_response_creates_file(tmp_path):
             path = folder / os.path.basename(path_str)
         return original_open(path, mode, encoding=encoding)
 
-
-    with patch("os.makedirs", side_effect=mocked_makedirs), \
-        patch("builtins.open", side_effect=mocked_open):
+    with patch("os.makedirs", side_effect=mocked_makedirs), patch(
+        "builtins.open", side_effect=mocked_open
+    ):
 
         save_api_response(url, params, response, save_mode="file")
 

@@ -1,12 +1,9 @@
 import requests
 
+
 def get_cloudflare_traffic_for_country(country_iso2, api_token, copy_to_file=False):
-    api_url = 'https://api.cloudflare.com/client/v4/radar/netflows/timeseries'
-    params = {
-        "name": "main",
-        "location": country_iso2,
-        "dateRange": "52w"
-    }
+    api_url = "https://api.cloudflare.com/client/v4/radar/netflows/timeseries"
+    params = {"name": "main", "location": country_iso2, "dateRange": "52w"}
     headers = {
         "Authorization": f"Bearer {api_token}",
     }
@@ -21,14 +18,17 @@ def get_cloudflare_traffic_for_country(country_iso2, api_token, copy_to_file=Fal
 
     return data
 
-def get_cloudflare_internet_quality_for_country(country_iso2, api_token, copy_to_file=False):
-    api_url = 'https://api.cloudflare.com/client/v4/radar/quality/iqi/timeseries_groups'
+
+def get_cloudflare_internet_quality_for_country(
+    country_iso2, api_token, copy_to_file=False
+):
+    api_url = "https://api.cloudflare.com/client/v4/radar/quality/iqi/timeseries_groups"
     params = {
         "name": "main",
         "location": country_iso2,
         "dateRange": "52w",
         "metric": "bandwidth",
-        "interpolation": "true"
+        "interpolation": "true",
     }
     headers = {
         "Authorization": f"Bearer {api_token}",
