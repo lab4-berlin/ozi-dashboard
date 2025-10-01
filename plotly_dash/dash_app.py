@@ -209,11 +209,12 @@ def update_graph_page1(n_intervals, selected_country):
             current_df_melted["cs_country_iso2"] == selected_country
         ]
 
-    fig = px.line(
+    fig = px.scatter(
         current_df_melted,
         x="cs_stats_timestamp",
         y="value",
         color="metric",  # Color by metric to differentiate lines
+        category_orders={"metric": ["cs_asns_stats", "cs_asns_ris"]}, # Order legends
         labels={
             "cs_stats_timestamp": "",
             "value": "Number of Autonomous Systems (ASN)",
@@ -229,7 +230,7 @@ def update_graph_page1(n_intervals, selected_country):
             )
         )
     )
-    fig.update_traces(line=dict(width=3))  # Make lines thicker
+    # fig.update_traces(line=dict(width=3))  # Make lines thicker
 
     fig.update_yaxes(rangemode="tozero")  # Ensure y-axis starts from 0
     fig.update_layout(
@@ -268,7 +269,7 @@ def update_graph_page2(n_intervals, selected_country):  # Changed argument name
             current_df_melted["cs_country_iso2"] == selected_country
         ]
 
-    fig = px.line(
+    fig = px.scatter(
         current_df_melted,
         x="cs_stats_timestamp",
         y="value",
