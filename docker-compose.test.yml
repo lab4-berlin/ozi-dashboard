@@ -15,5 +15,14 @@ services:
       - "8050:8050"
     restart: "no"
 
+  nginx:
+    # Disable nginx for test environment
+    # It will not be started when using docker-compose.test.yml
+    image: alpine/git # Use a dummy image to prevent starting the actual nginx service
+    command: ["tail", "-f", "/dev/null"]
+    ports: [] # Ensure no ports are exposed
+    networks: [] # Ensure no networks are connected
+    depends_on: [] # Ensure no dependencies
+
 volumes:
   ozi_pgdata_volume:
