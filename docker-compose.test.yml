@@ -10,5 +10,10 @@ services:
       context: ./etl
       dockerfile: Dockerfile.test
 
+  plotly-dash-app:
+    ports:
+      - "8050:8050"
+    restart: "no"
+
 volumes:
   ozi_pgdata_volume:
