@@ -22,7 +22,7 @@ jobs:
         echo "POSTGRES_PASSWORD=password" >> .env.ozi
         echo "POSTGRES_OZI_USER=ozi" >> .env.ozi
         echo "POSTGRES_OZI_PASSWORD=ozi_password" >> .env.ozi
-        echo "POSTGRES_DB=db" >> .env.ozi
+        echo "POSTGRES_DB=ozi_db2" >> .env.ozi
 
     - name: Build ETL Production Image
       run: DOCKER_BUILDKIT=0 docker compose build ozi-etl
