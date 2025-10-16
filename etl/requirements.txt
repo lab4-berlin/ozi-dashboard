@@ -3,7 +3,6 @@ charset-normalizer==3.4.0
 idna==3.10
 markdown-it-py==3.0.0
 mdurl==0.1.2
-psycopg2-binary==2.9.10
 Pygments==2.18.0
 requests==2.32.3
 rich==13.9.4
