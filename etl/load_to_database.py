@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.sql.functions import current_date
 from sqlalchemy import text
 
-HOST = os.getenv("POSTGRES_HOST", "ozi-postgres")
+HOST = os.getenv("POSTGRES_HOST", "localhost")
 PORT = os.getenv("POSTGRES_PORT", "5432")
 USER = os.getenv("POSTGRES_OZI_USER", "ozi")
 PASSWORD = os.getenv("POSTGRES_OZI_PASSWORD", "ozi_password")
