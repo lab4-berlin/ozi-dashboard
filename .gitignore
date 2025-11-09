@@ -2,3 +2,4 @@ etl/logs/*
 *.env
 *.env.*
 !.env.*.example
+./idea
