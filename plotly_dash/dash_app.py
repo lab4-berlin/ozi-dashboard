@@ -274,7 +274,6 @@ def update_graph_page2(n_intervals, selected_country):  # Changed argument name
         x="cs_stats_timestamp",
         y="value",
         color="metric",  # Color by metric to differentiate lines
-        line_dash="metric",  # Use line dash to differentiate metrics
         title=f'Country Statistics Over Time - Page 2 ({selected_country if selected_country else ""}) - ASNs RIS vs Stats',
         labels={
             "cs_stats_timestamp": "Date",
