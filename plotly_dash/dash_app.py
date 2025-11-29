@@ -235,7 +235,7 @@ def layout_page3_content():
                     dcc.Dropdown(
                         id="country-dropdown-page3",
                         options=dropdown_options,
-                        value="UA",
+                        value="RU",
                         multi=False,
                         placeholder="Select a country",
                         closeOnSelect=True,
@@ -271,7 +271,7 @@ def layout_page4_content():
                     dcc.Dropdown(
                         id="country-dropdown-page4",
                         options=dropdown_options,
-                        value="UA",
+                        value="RU",
                         multi=False,
                         placeholder="Выберите страну",
                         closeOnSelect=True,
@@ -307,7 +307,7 @@ def layout_page5_content():
                     dcc.Dropdown(
                         id="country-dropdown-page5",
                         options=dropdown_options,
-                        value="UA",
+                        value="RU",
                         multi=False,
                         placeholder="Select a country",
                         closeOnSelect=True,
@@ -343,7 +343,7 @@ def layout_page6_content():
                     dcc.Dropdown(
                         id="country-dropdown-page6",
                         options=dropdown_options,
-                        value="UA",
+                        value="RU",
                         multi=False,
                         placeholder="Выберите страну",
                         closeOnSelect=True,
@@ -379,7 +379,7 @@ def layout_page7_content():
                     dcc.Dropdown(
                         id="country-dropdown-page7",
                         options=dropdown_options,
-                        value="UA",
+                        value="RU",
                         multi=False,
                         placeholder="Select a country",
                         closeOnSelect=True,
@@ -415,7 +415,7 @@ def layout_page8_content():
                     dcc.Dropdown(
                         id="country-dropdown-page8",
                         options=dropdown_options,
-                        value="UA",
+                        value="RU",
                         multi=False,
                         placeholder="Выберите страну",
                         closeOnSelect=True,
