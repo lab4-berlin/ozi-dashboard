@@ -595,6 +595,41 @@ CREATE VIEW data.v_connectivity_index_by_country AS
 ALTER VIEW data.v_connectivity_index_by_country OWNER TO ozi;
 
 --
+-- Name: v_connectivity_index_distinct; Type: VIEW; Schema: data; Owner: ozi
+--
+
+CREATE VIEW data.v_connectivity_index_distinct AS
+ SELECT asn_country,
+    an_date AS date,
+    count(DISTINCT an_asn) AS asn_count,
+    sum(
+        CASE
+            WHEN is_foreign_neighbour THEN 1
+            ELSE 0
+        END) AS foreign_neighbour_count,
+    sum(
+        CASE
+            WHEN NOT is_foreign_neighbour THEN 1
+            ELSE 0
+        END) AS local_neighbour_count,
+    count(*) AS total_neighbour_count,
+    round(sum(
+        CASE
+            WHEN is_foreign_neighbour THEN 1
+            ELSE 0
+        END)::double precision / NULLIF(count(*), 0)::double precision * 100::double precision) AS foreign_share_pct
+   FROM ( SELECT DISTINCT v_asn_neighbour.an_asn,
+            v_asn_neighbour.an_neighbour,
+            v_asn_neighbour.an_date,
+            v_asn_neighbour.asn_country,
+            v_asn_neighbour.is_foreign_neighbour
+           FROM data.v_asn_neighbour) deduplicated
+  GROUP BY asn_country, an_date;
+
+
+ALTER VIEW data.v_connectivity_index_distinct OWNER TO ozi;
+
+--
 -- Name: v_country_stat_1d; Type: VIEW; Schema: data; Owner: ozi
 --
 
