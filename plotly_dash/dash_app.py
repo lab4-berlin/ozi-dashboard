@@ -435,6 +435,32 @@ def layout_page8_content():
 app.layout = html.Div(
     [
         dcc.Location(id="url", refresh=False),
+        # Navigation menu
+        html.Div(
+            [
+                dcc.Link('ASN Stats', href='/asn-stats', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+                html.Span(' | ', style={'padding': '0 5px'}),
+                dcc.Link('ASN Time Series', href='/asn-timeseries/RU', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+                html.Span(' | ', style={'padding': '0 5px'}),
+                dcc.Link('Global Connectivity', href='/global-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+                html.Span(' | ', style={'padding': '0 5px'}),
+                dcc.Link('Глобальная связанность', href='/ru/global-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+                html.Span(' | ', style={'padding': '0 5px'}),
+                dcc.Link('Local Connectivity', href='/local-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+                html.Span(' | ', style={'padding': '0 5px'}),
+                dcc.Link('Локальная связанность', href='/ru/local-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+                html.Span(' | ', style={'padding': '0 5px'}),
+                dcc.Link('Total Share', href='/total-share', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+                html.Span(' | ', style={'padding': '0 5px'}),
+                dcc.Link('Общая доля', href='/ru/total-share', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+            ],
+            style={
+                'padding': '15px',
+                'backgroundColor': '#f8f9fa',
+                'borderBottom': '2px solid #dee2e6',
+                'textAlign': 'center'
+            }
+        ),
         html.Div(
             id="page-1-container",
             children=layout_page1_content(),
