@@ -183,7 +183,7 @@ print(df_melted.info())
 
 
 # Function to create control panel (country + date range)
-def create_control_panel(page_id, dropdown_options, language='en', data_source='connectivity'):
+def create_control_panel(page_id, dropdown_options, language='en'):
     """
     Creates a reusable control panel with country selection and date range picker.
     
@@ -191,18 +191,10 @@ def create_control_panel(page_id, dropdown_options, language='en', data_source='
         page_id: Unique identifier for the page (e.g., 'page3', 'page4')
         dropdown_options: List of dropdown options for country selection
         language: 'en' or 'ru' for labels
-        data_source: 'connectivity' for connectivity index pages, 'country_stat' for country statistics pages
     """
-    if data_source == 'country_stat':
-        # Use country_stat data for pages 1 and 2
-        country_stat_df = fetch_data()
-        min_date = country_stat_df['cs_stats_timestamp'].min() if len(country_stat_df) > 0 else None
-        max_date = country_stat_df['cs_stats_timestamp'].max() if len(country_stat_df) > 0 else None
-    else:
-        # Use connectivity data for all other pages
-        connectivity_df = fetch_connectivity_data()
-        min_date = connectivity_df['date'].min() if len(connectivity_df) > 0 else None
-        max_date = connectivity_df['date'].max() if len(connectivity_df) > 0 else None
+    connectivity_df = fetch_connectivity_data()
+    min_date = connectivity_df['date'].min() if len(connectivity_df) > 0 else None
+    max_date = connectivity_df['date'].max() if len(connectivity_df) > 0 else None
     
     labels = {
         'en': {'country': 'Country:', 'date_range': 'Date Range:', 'date_from': 'Date from', 'date_to': 'Date to'},
@@ -332,7 +324,7 @@ def layout_page1_content():
                 "fontWeight": "600",
                 "color": "#1a1a1a"
             }),
-            create_control_panel('page1', dropdown_options, 'en', data_source='country_stat'),
+            create_control_panel('page1', dropdown_options, 'en'),
             dcc.Graph(
                 id="time-series-graph-page1",
                 config={'responsive': True},
@@ -372,7 +364,7 @@ def layout_page2_content():
                 "fontWeight": "600",
                 "color": "#1a1a1a"
             }),
-            create_control_panel('page2', dropdown_options, 'ru', data_source='country_stat'),
+            create_control_panel('page2', dropdown_options, 'ru'),
             dcc.Graph(
                 id="time-series-graph-page2",
                 config={'responsive': True},
@@ -1280,129 +1272,6 @@ def set_dropdown_value_from_url(pathname):
             if country_code in df["cs_country_iso2"].unique():
                 return country_code
     return "RU"  # Default to RU if no country selected from URL
-
-
-# Callbacks to dynamically update date pickers with fresh data
-# Pages 1 and 2 use country_stat data
-@app.callback(
-    Output("date-from-page1", "min_date_allowed"),
-    Output("date-from-page1", "max_date_allowed"),
-    Output("date-to-page1", "min_date_allowed"),
-    Output("date-to-page1", "max_date_allowed"),
-    Output("date-to-page1", "date"),
-    Input("interval-component-page1", "n_intervals"),
-)
-def update_date_range_page1(n_intervals):
-    current_df = fetch_data()
-    min_date = current_df['cs_stats_timestamp'].min() if len(current_df) > 0 else None
-    max_date = current_df['cs_stats_timestamp'].max() if len(current_df) > 0 else None
-    return min_date, max_date, min_date, max_date, max_date
-
-
-@app.callback(
-    Output("date-from-page2", "min_date_allowed"),
-    Output("date-from-page2", "max_date_allowed"),
-    Output("date-to-page2", "min_date_allowed"),
-    Output("date-to-page2", "max_date_allowed"),
-    Output("date-to-page2", "date"),
-    Input("interval-component-page2", "n_intervals"),
-)
-def update_date_range_page2(n_intervals):
-    current_df = fetch_data()
-    min_date = current_df['cs_stats_timestamp'].min() if len(current_df) > 0 else None
-    max_date = current_df['cs_stats_timestamp'].max() if len(current_df) > 0 else None
-    return min_date, max_date, min_date, max_date, max_date
-
-
-# Pages 3-8 use connectivity data
-@app.callback(
-    Output("date-from-page3", "min_date_allowed"),
-    Output("date-from-page3", "max_date_allowed"),
-    Output("date-to-page3", "min_date_allowed"),
-    Output("date-to-page3", "max_date_allowed"),
-    Output("date-to-page3", "date"),
-    Input("interval-component-page3", "n_intervals"),
-)
-def update_date_range_page3(n_intervals):
-    connectivity_df = fetch_connectivity_data()
-    min_date = connectivity_df['date'].min() if len(connectivity_df) > 0 else None
-    max_date = connectivity_df['date'].max() if len(connectivity_df) > 0 else None
-    return min_date, max_date, min_date, max_date, max_date
-
-
-@app.callback(
-    Output("date-from-page4", "min_date_allowed"),
-    Output("date-from-page4", "max_date_allowed"),
-    Output("date-to-page4", "min_date_allowed"),
-    Output("date-to-page4", "max_date_allowed"),
-    Output("date-to-page4", "date"),
-    Input("interval-component-page4", "n_intervals"),
-)
-def update_date_range_page4(n_intervals):
-    connectivity_df = fetch_connectivity_data()
-    min_date = connectivity_df['date'].min() if len(connectivity_df) > 0 else None
-    max_date = connectivity_df['date'].max() if len(connectivity_df) > 0 else None
-    return min_date, max_date, min_date, max_date, max_date
-
-
-@app.callback(
-    Output("date-from-page5", "min_date_allowed"),
-    Output("date-from-page5", "max_date_allowed"),
-    Output("date-to-page5", "min_date_allowed"),
-    Output("date-to-page5", "max_date_allowed"),
-    Output("date-to-page5", "date"),
-    Input("interval-component-page5", "n_intervals"),
-)
-def update_date_range_page5(n_intervals):
-    connectivity_df = fetch_connectivity_data()
-    min_date = connectivity_df['date'].min() if len(connectivity_df) > 0 else None
-    max_date = connectivity_df['date'].max() if len(connectivity_df) > 0 else None
-    return min_date, max_date, min_date, max_date, max_date
-
-
-@app.callback(
-    Output("date-from-page6", "min_date_allowed"),
-    Output("date-from-page6", "max_date_allowed"),
-    Output("date-to-page6", "min_date_allowed"),
-    Output("date-to-page6", "max_date_allowed"),
-    Output("date-to-page6", "date"),
-    Input("interval-component-page6", "n_intervals"),
-)
-def update_date_range_page6(n_intervals):
-    connectivity_df = fetch_connectivity_data()
-    min_date = connectivity_df['date'].min() if len(connectivity_df) > 0 else None
-    max_date = connectivity_df['date'].max() if len(connectivity_df) > 0 else None
-    return min_date, max_date, min_date, max_date, max_date
-
-
-@app.callback(
-    Output("date-from-page7", "min_date_allowed"),
-    Output("date-from-page7", "max_date_allowed"),
-    Output("date-to-page7", "min_date_allowed"),
-    Output("date-to-page7", "max_date_allowed"),
-    Output("date-to-page7", "date"),
-    Input("interval-component-page7", "n_intervals"),
-)
-def update_date_range_page7(n_intervals):
-    connectivity_df = fetch_connectivity_data()
-    min_date = connectivity_df['date'].min() if len(connectivity_df) > 0 else None
-    max_date = connectivity_df['date'].max() if len(connectivity_df) > 0 else None
-    return min_date, max_date, min_date, max_date, max_date
-
-
-@app.callback(
-    Output("date-from-page8", "min_date_allowed"),
-    Output("date-from-page8", "max_date_allowed"),
-    Output("date-to-page8", "min_date_allowed"),
-    Output("date-to-page8", "max_date_allowed"),
-    Output("date-to-page8", "date"),
-    Input("interval-component-page8", "n_intervals"),
-)
-def update_date_range_page8(n_intervals):
-    connectivity_df = fetch_connectivity_data()
-    min_date = connectivity_df['date'].min() if len(connectivity_df) > 0 else None
-    max_date = connectivity_df['date'].max() if len(connectivity_df) > 0 else None
-    return min_date, max_date, min_date, max_date, max_date
 
 
 if __name__ == "__main__":
