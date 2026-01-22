@@ -11,12 +11,15 @@ last_data_fetch_time = None
 cached_df = None
 last_connectivity_fetch_time = None
 cached_connectivity_df = None
+last_date_range_fetch_time = {}  # Cache per source_type
+cached_date_ranges = {}  # Cache per source_type
 country_names_ru = {}
 country_names_en = {}
-CACHE_TTL_SECONDS = 60  # Cache will be considered stale after 60 seconds
+CACHE_TTL_SECONDS = 300  # Cache will be considered stale after 5 minutes (was 60)
+DATE_RANGE_CACHE_TTL = 600  # Date ranges cache for 10 minutes
 
 
-def fetch_data():
+def fetch_data(start_date=None, end_date=None):
     global last_data_fetch_time, cached_df, country_names_ru, country_names_en
 
     # Check if cached data is still fresh
@@ -26,52 +29,56 @@ def fetch_data():
         and (datetime.now() - last_data_fetch_time).total_seconds() < CACHE_TTL_SECONDS
     ):
         print("Serving data from cache.")
-        return cached_df
+        df = cached_df
+    else:
+        print("Fetching new data from database...")
+        db_url = (
+            f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
+            f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
+            f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
+            f"{os.environ.get('DASH_DB_PORT', '5432')}/"
+            f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
+        )
+        engine = sqlalchemy.create_engine(db_url)
 
-    print("Fetching new data from database...")
-    db_url = (
-        f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
-        f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
-        f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
-        f"{os.environ.get('DASH_DB_PORT', '5432')}/"
-        f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
-    )
-    engine = sqlalchemy.create_engine(db_url)
+        # Fetch country statistics data
+        query_stats = """SELECT
+                    cs_country_iso2,
+                    cs_stats_timestamp,
+                    cs_asns_ris,
+                    cs_asns_stats
+                 FROM data.country_stat
+                 ORDER BY cs_stats_timestamp;"""
+        df = pd.read_sql(query_stats, engine)
 
-    # Fetch country statistics data
-    query_stats = """SELECT
-                cs_country_iso2,
-                cs_stats_timestamp,
-                cs_asns_ris,
-                cs_asns_stats
-             FROM data.country_stat
-             ORDER BY cs_stats_timestamp;"""
-    df = pd.read_sql(query_stats, engine)
+        # Fetch country names in Russian and English
+        query_countries = "SELECT c_iso2, c_name_ru, c_name FROM data.country;"
+        df_countries = pd.read_sql(query_countries, engine)
+        engine.dispose()
 
-    # Fetch country names in Russian and English
-    query_countries = "SELECT c_iso2, c_name_ru, c_name FROM data.country;"
-    df_countries = pd.read_sql(query_countries, engine)
-    engine.dispose()
+        # Populate country_names_ru and country_names_en dictionaries
+        country_names_ru = {
+            row["c_iso2"]: row["c_name_ru"] for index, row in df_countries.iterrows()
+        }
+        country_names_en = {
+            row["c_iso2"]: row["c_name"] for index, row in df_countries.iterrows()
+        }
 
-    # Populate country_names_ru and country_names_en dictionaries
-    country_names_ru = {
-        row["c_iso2"]: row["c_name_ru"] for index, row in df_countries.iterrows()
-    }
-    country_names_en = {
-        row["c_iso2"]: row["c_name"] for index, row in df_countries.iterrows()
-    }
+        # Update cache and timestamp
+        cached_df = df
+        last_data_fetch_time = datetime.now()
 
-    # Update cache and timestamp
-    cached_df = df
-    last_data_fetch_time = datetime.now()
+        print(f"Fetched {len(df)} records from database")
 
-    print("\n--- Original DataFrame (df) ---")
-    print(df.head())
-    print(df.info())
+    # Filter by date if provided
+    if start_date and end_date:
+        mask = (df["cs_stats_timestamp"] >= start_date) & (df["cs_stats_timestamp"] <= end_date)
+        return df.loc[mask]
+    
     return df
 
 
-def fetch_connectivity_data():
+def fetch_connectivity_data(start_date=None, end_date=None):
     global last_connectivity_fetch_time, cached_connectivity_df
 
     # Check if cached data is still fresh
@@ -81,34 +88,39 @@ def fetch_connectivity_data():
         and (datetime.now() - last_connectivity_fetch_time).total_seconds() < CACHE_TTL_SECONDS
     ):
         print("Serving connectivity data from cache.")
-        return cached_connectivity_df
+        df = cached_connectivity_df
+    else:
+        print("Fetching connectivity data from database...")
+        db_url = (
+            f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
+            f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
+            f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
+            f"{os.environ.get('DASH_DB_PORT', '5432')}/"
+            f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
+        )
+        engine = sqlalchemy.create_engine(db_url)
 
-    print("Fetching connectivity data from database...")
-    db_url = (
-        f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
-        f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
-        f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
-        f"{os.environ.get('DASH_DB_PORT', '5432')}/"
-        f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
-    )
-    engine = sqlalchemy.create_engine(db_url)
+        query = """SELECT 
+                    asn_country,
+                    date,
+                    asn_count,
+                    foreign_neighbour_count,
+                    local_neighbour_count,
+                    total_neighbour_count,
+                    foreign_share_pct
+                 FROM data.v_connectivity_index_distinct
+                 ORDER BY date;"""
+        df = pd.read_sql(query, engine)
+        engine.dispose()
 
-    query = """SELECT 
-                asn_country,
-                date,
-                asn_count,
-                foreign_neighbour_count,
-                local_neighbour_count,
-                total_neighbour_count,
-                foreign_share_pct
-             FROM data.v_connectivity_index_distinct
-             ORDER BY date;"""
-    df = pd.read_sql(query, engine)
-    engine.dispose()
+        # Update cache and timestamp
+        cached_connectivity_df = df
+        last_connectivity_fetch_time = datetime.now()
 
-    # Update cache and timestamp
-    cached_connectivity_df = df
-    last_connectivity_fetch_time = datetime.now()
+    # Filter by date if provided
+    if start_date and end_date:
+        mask = (df["date"] >= start_date) & (df["date"] <= end_date)
+        return df.loc[mask]
 
     return df
 
@@ -167,535 +179,421 @@ def add_security_headers(response):
     return response
 
 
-df = fetch_data()
+# Create Navigation Bar
+def create_navbar():
+    return html.Div(
+        [
+            dcc.Link('ASN Stats', href='/asn-stats', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+            html.Span(' | ', style={'padding': '0 5px'}),
+            dcc.Link('ASN Time Series', href='/asn-timeseries/RU', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+            html.Span(' | ', style={'padding': '0 5px'}),
+            dcc.Link('Global Connectivity', href='/global-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+            html.Span(' | ', style={'padding': '0 5px'}),
+            dcc.Link('Глобальная связанность', href='/ru/global-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+            html.Span(' | ', style={'padding': '0 5px'}),
+            dcc.Link('Local Connectivity', href='/local-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+            html.Span(' | ', style={'padding': '0 5px'}),
+            dcc.Link('Локальная связанность', href='/ru/local-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+            html.Span(' | ', style={'padding': '0 5px'}),
+            dcc.Link('Total Share', href='/total-share', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+            html.Span(' | ', style={'padding': '0 5px'}),
+            dcc.Link('Общая доля', href='/ru/total-share', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
+        ],
+        style={
+            'padding': '15px',
+            'backgroundColor': '#f8f9fa',
+            'borderBottom': '2px solid #dee2e6',
+            'textAlign': 'center'
+        }
+    )
 
-# Melt the DataFrame to long format for easier plotting of multiple metrics
-df_melted = df.melt(
-    id_vars=["cs_country_iso2", "cs_stats_timestamp"],
-    value_vars=["cs_asns_ris", "cs_asns_stats"],
-    var_name="metric",
-    value_name="value",
-)
-
-print("\n--- Melted DataFrame (df_melted) ---")
-print(df_melted.head())
-print(df_melted.info())
-
-
-# Function to create control panel (country + date range)
-def create_control_panel(page_id, dropdown_options, language='en'):
+# Helper function to get available date range from database
+def get_available_date_range(source_type='combined'):
     """
-    Creates a reusable control panel with country selection and date range picker.
+    Query database to find min and max dates actually available in data
     
     Args:
-        page_id: Unique identifier for the page (e.g., 'page3', 'page4')
-        dropdown_options: List of dropdown options for country selection
-        language: 'en' or 'ru' for labels
+        source_type: 'stats', 'connectivity', or 'combined' (default)
     """
-    connectivity_df = fetch_connectivity_data()
-    min_date = connectivity_df['date'].min() if len(connectivity_df) > 0 else None
-    max_date = connectivity_df['date'].max() if len(connectivity_df) > 0 else None
+    global last_date_range_fetch_time, cached_date_ranges
     
-    labels = {
-        'en': {'country': 'Country:', 'date_range': 'Date Range:', 'date_from': 'Date from', 'date_to': 'Date to'},
-        'ru': {'country': 'Страна:', 'date_range': 'Диапазон дат:', 'date_from': 'Date from', 'date_to': 'Date to'}
-    }
-    lang = labels.get(language, labels['en'])
+    # Check cache first
+    cache_key = source_type
+    if (
+        cache_key in cached_date_ranges
+        and cache_key in last_date_range_fetch_time
+        and (datetime.now() - last_date_range_fetch_time[cache_key]).total_seconds() < DATE_RANGE_CACHE_TTL
+    ):
+        print(f"Serving date range for {source_type} from cache")
+        return cached_date_ranges[cache_key]
+    
+    try:
+        db_url = (
+            f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
+            f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
+            f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
+            f"{os.environ.get('DASH_DB_PORT', '5432')}/"
+            f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
+        )
+        engine = sqlalchemy.create_engine(db_url)
+        
+        # Choose query based on source type
+        if source_type == 'stats':
+            query = """
+                SELECT 
+                    MIN(cs_stats_timestamp::date) as min_date,
+                    MAX(cs_stats_timestamp::date) as max_date
+                FROM data.country_stat
+            """
+        elif source_type == 'connectivity':
+            query = """
+                SELECT 
+                    MIN(date::date) as min_date,
+                    MAX(date::date) as max_date
+                FROM data.v_connectivity_index_distinct
+            """
+        else:  # combined
+            query = """
+                SELECT 
+                    MIN(date_col) as min_date,
+                    MAX(date_col) as max_date
+                FROM (
+                    SELECT cs_stats_timestamp::date as date_col FROM data.country_stat
+                    UNION ALL
+                    SELECT date::date as date_col FROM data.v_connectivity_index_distinct
+                ) combined_dates
+            """
+        
+        result = pd.read_sql(query, engine)
+        engine.dispose()
+        
+        if not result.empty and result['min_date'].iloc[0] is not None:
+            min_date = pd.to_datetime(result['min_date'].iloc[0]).date()
+            max_date = pd.to_datetime(result['max_date'].iloc[0]).date()
+            
+            # Cache the result
+            cached_date_ranges[cache_key] = (min_date, max_date)
+            last_date_range_fetch_time[cache_key] = datetime.now()
+            
+            return min_date, max_date
+        else:
+            # Fallback to default range if no data
+            today = datetime.now().date()
+            return today - timedelta(days=365*3), today
+    except Exception as e:
+        print(f"Error fetching date range for {source_type}: {e}")
+        # Fallback to default range on error
+        today = datetime.now().date()
+        return today - timedelta(days=365*3), today
+
+# Date Picker for specific data source
+def create_date_picker(picker_id="global-date-picker", source_type='combined', label_suffix=''):
+    """
+    Create a date picker with data range from specified source
+    
+    Args:
+        picker_id: ID for the date picker component
+        source_type: 'stats', 'connectivity', or 'combined'
+        label_suffix: Additional text to add to the label (e.g., '(Stats data)')
+    """
+    min_date, max_date = get_available_date_range(source_type)
+    # Default selection: show full available data range
+    default_start = min_date
+    default_end = max_date
+    
+    data_source_label = {
+        'stats': ' (Stats data)',
+        'connectivity': ' (Connectivity data)',
+        'combined': ''
+    }.get(source_type, '')
     
     return html.Div(
         [
-            # Country selection
             html.Div([
-                html.Label(lang['country'], style={
-                    "display": "block", 
-                    "marginBottom": "8px", 
-                    "fontWeight": "600", 
-                    "fontSize": "12px",
-                    "color": "#000",
-                    "textTransform": "uppercase",
-                    "letterSpacing": "0.5px"
-                }),
-                dcc.Dropdown(
-                    id=f"country-dropdown-{page_id}",
-                    options=dropdown_options,
-                    value="RU",
-                    multi=False,
-                    placeholder=lang['country'].replace(':', ''),
-                    closeOnSelect=True,
-                    clearable=False,
-                    style={"fontSize": "14px", "width": "100%"}
+                html.Label(f"Select Date Range{data_source_label}:", style={"fontWeight": "bold", "marginRight": "10px", "fontSize": "14px"}),
+                dcc.DatePickerRange(
+                    id=picker_id,
+                    min_date_allowed=min_date,
+                    max_date_allowed=max_date,
+                    initial_visible_month=max_date,
+                    start_date=default_start,
+                    end_date=default_end,
+                    display_format="YYYY-MM-DD",
+                    style={"fontSize": "14px"}
                 )
-            ], style={"marginBottom": "20px"}),
-            
-            # Date range selection
-            html.Div([
-                html.Label(lang['date_range'], style={
-                    "display": "block", 
-                    "marginBottom": "6px", 
-                    "fontWeight": "600", 
-                    "fontSize": "12px",
-                    "color": "#000",
-                    "textTransform": "uppercase",
-                    "letterSpacing": "0.5px"
-                }),
-                html.Div([
-                    dcc.DatePickerSingle(
-                        id=f'date-from-{page_id}',
-                        min_date_allowed=min_date,
-                        max_date_allowed=max_date,
-                        initial_visible_month=min_date,
-                        date=min_date,
-                        display_format='YYYY-MM-DD',
-                        placeholder=lang['date_from'],
-                        style={"fontSize": "13px", "marginRight": "8px"}
-                    ),
-                    html.Span("—", style={
-                        "margin": "0 6px", 
-                        "fontSize": "13px", 
-                        "color": "#999",
-                        "display": "inline-block",
-                        "fontWeight": "300"
-                    }),
-                    dcc.DatePickerSingle(
-                        id=f'date-to-{page_id}',
-                        min_date_allowed=min_date,
-                        max_date_allowed=max_date,
-                        initial_visible_month=max_date,
-                        date=max_date,
-                        display_format='YYYY-MM-DD',
-                        placeholder=lang['date_to'],
-                        style={"fontSize": "13px", "marginRight": "12px"}
-                    ),
-                    html.Button('Apply', id=f'apply-dates-{page_id}', n_clicks=0, 
-                              style={
-                                  "padding": "6px 18px", 
-                                  "cursor": "pointer", 
-                                  "backgroundColor": "#1f77b4", 
-                                  "color": "white", 
-                                  "border": "none", 
-                                  "borderRadius": "5px", 
-                                  "fontWeight": "600", 
-                                  "fontSize": "12px",
-                                  "boxShadow": "0 2px 5px rgba(31, 119, 180, 0.3)",
-                                  "transition": "all 0.2s",
-                                  "height": "32px",
-                                  "textTransform": "uppercase",
-                                  "letterSpacing": "0.5px"
-                              })
-                ], style={
-                    "display": "flex", 
-                    "alignItems": "center",
-                    "flexWrap": "wrap",
-                    "gap": "6px"
-                }),
-            ]),
+            ], style={"display": "flex", "alignItems": "center", "justifyContent": "center"}),
+            html.Div(
+                f"Available: {min_date} to {max_date}",
+                style={"fontSize": "12px", "color": "#666", "textAlign": "center", "marginTop": "5px"}
+            )
         ],
-        style={
-            "width": "100%", 
-            "maxWidth": "1200px",
-            "padding": "25px 30px", 
-            "backgroundColor": "#f8f9fa",
-            "borderRadius": "10px",
-            "marginBottom": "25px",
-            "margin": "0 auto",
-            "boxShadow": "0 2px 8px rgba(0,0,0,0.05)"
-        },
+        style={"padding": "10px", "marginBottom": "20px"}
     )
-
 
 # Layout for Page 1 (Original Dashboard)
-def layout_page1_content():
-    # Create dropdown options with English names
+def layout_page1_content(df):
     dropdown_options = []
     for country_iso in df["cs_country_iso2"].unique():
-        english_name = country_names_en.get(
-            country_iso, country_iso
-        )  # Fallback to ISO if English name not found
-        dropdown_options.append(
-            {"label": f"{country_iso}, {english_name}", "value": country_iso}
-        )
+        english_name = country_names_en.get(country_iso, country_iso)
+        dropdown_options.append({"label": f"{country_iso}, {english_name}", "value": country_iso})
     dropdown_options = sorted(dropdown_options, key=lambda k: k["label"])
 
-    return html.Div(
-        [
-            html.H1("Country Statistics Time Series", style={
-                "marginBottom": "25px",
-                "fontSize": "28px",
-                "fontWeight": "600",
-                "color": "#1a1a1a"
-            }),
-            create_control_panel('page1', dropdown_options, 'en'),
-            dcc.Graph(
-                id="time-series-graph-page1",
-                config={'responsive': True},
-                style={"width": "100%", "height": "70vh", "minHeight": "400px", "paddingLeft": "20px", "paddingRight": "20px"}
-            ),
-            dcc.Store(id='date-range-store-page1'),
-            dcc.Interval(
-                id="interval-component-page1", interval=5 * 60 * 1000, n_intervals=0
-            ),
-        ],
-        style={
-            "padding": "20px 20px",
-            "maxWidth": "100%",
-            "margin": "0 auto"
-        }
-    )
+    return html.Div([
+        create_date_picker(picker_id="global-date-picker", source_type="stats"),
+        html.H1("ASN Statistics"),
+        html.Div([
+            dcc.Dropdown(
+                id="country-dropdown-page1",
+                options=dropdown_options,
+                value="RU",
+                multi=False,
+                placeholder="Select a country",
+                closeOnSelect=True,
+                clearable=False,
+            )
+        ], style={"width": "50%", "padding": "20px"}),
+        dcc.Graph(id="time-series-graph-page1", style={"height": "600px"}),
+        dcc.Interval(id="interval-component-page1", interval=5 * 60 * 1000, n_intervals=0),
+    ])
 
 
-# Layout for Page 2 (Copy of Original Dashboard, can be modified later)
-def layout_page2_content():
-    # Create dropdown options with Russian names
+# Layout for Page 2 (Copy of Original Dashboard)
+def layout_page2_content(df):
     dropdown_options = []
     for country_iso in df["cs_country_iso2"].unique():
-        russian_name = country_names_ru.get(
-            country_iso, country_iso
-        )  # Fallback to ISO if Russian name not found
-        dropdown_options.append(
-            {"label": f"{country_iso}, {russian_name}", "value": country_iso}
-        )
+        russian_name = country_names_ru.get(country_iso, country_iso)
+        dropdown_options.append({"label": f"{country_iso}, {russian_name}", "value": country_iso})
     dropdown_options = sorted(dropdown_options, key=lambda k: k["label"])
 
-    return html.Div(
-        [
-            html.H1("Статистика стран - временные ряды", style={
-                "marginBottom": "25px",
-                "fontSize": "28px",
-                "fontWeight": "600",
-                "color": "#1a1a1a"
-            }),
-            create_control_panel('page2', dropdown_options, 'ru'),
-            dcc.Graph(
-                id="time-series-graph-page2",
-                config={'responsive': True},
-                style={"width": "100%", "height": "70vh", "minHeight": "400px", "paddingLeft": "20px", "paddingRight": "20px"}
-            ),
-            dcc.Store(id='date-range-store-page2'),
-            dcc.Interval(
-                id="interval-component-page2", interval=5 * 60 * 1000, n_intervals=0
-            ),
-        ],
-        style={
-            "padding": "20px 20px",
-            "maxWidth": "100%",
-            "margin": "0 auto"
-        }
-    )
+    return html.Div([
+        create_date_picker(picker_id="global-date-picker", source_type="stats"),
+        html.H1(f"Country Statistics"),
+        html.Div([
+            dcc.Dropdown(
+                id="country-dropdown-page2-single",
+                options=dropdown_options,
+                multi=False,
+                value="RU",
+                placeholder="Select a country",
+                closeOnSelect=True,
+            )
+        ], style={"width": "50%", "padding": "20px"}),
+        dcc.Graph(id="time-series-graph-page2", style={"height": "600px"}),
+        dcc.Interval(id="interval-component-page2", interval=5 * 60 * 1000, n_intervals=0),
+    ])
 
 
 # Layout for Page 3 - Foreign Neighbours (English)
-def layout_page3_content():
-    connectivity_df = fetch_connectivity_data()
+def layout_page3_content(connectivity_df):
     dropdown_options = []
     for country_iso in connectivity_df["asn_country"].unique():
         english_name = country_names_en.get(country_iso, country_iso)
-        dropdown_options.append(
-            {"label": f"{country_iso}, {english_name}", "value": country_iso}
-        )
+        dropdown_options.append({"label": f"{country_iso}, {english_name}", "value": country_iso})
     dropdown_options = sorted(dropdown_options, key=lambda k: k["label"])
 
-    return html.Div(
-        [
-            html.H1("Global connectivity statistics", style={
-                "marginBottom": "25px",
-                "fontSize": "28px",
-                "fontWeight": "600",
-                "color": "#1a1a1a"
-            }),
-            create_control_panel('page3', dropdown_options, 'en'),
-            dcc.Graph(
-                id="time-series-graph-page3",
-                config={'responsive': True},
-                style={"width": "100%", "height": "70vh", "minHeight": "400px", "paddingLeft": "20px", "paddingRight": "20px"}
-            ),
-            dcc.Store(id='date-range-store-page3'),
-            dcc.Interval(
-                id="interval-component-page3", interval=5 * 60 * 1000, n_intervals=0
-            ),
-        ],
-        style={
-            "padding": "20px 20px",
-            "maxWidth": "100%",
-            "margin": "0 auto"
-        }
-    )
+    return html.Div([
+        create_date_picker(picker_id="global-date-picker", source_type="connectivity"),
+        html.H1("Global Connectivity Statistics"),
+        html.Div([
+            dcc.Dropdown(
+                id="country-dropdown-page3",
+                options=dropdown_options,
+                value="RU",
+                multi=False,
+                placeholder="Select a country",
+                closeOnSelect=True,
+                clearable=False,
+            )
+        ], style={"width": "50%", "padding": "20px"}),
+        dcc.Graph(id="time-series-graph-page3", style={"height": "600px"}),
+        dcc.Interval(id="interval-component-page3", interval=5 * 60 * 1000, n_intervals=0),
+    ])
 
 
 # Layout for Page 4 - Foreign Neighbours (Russian)
-def layout_page4_content():
-    connectivity_df = fetch_connectivity_data()
+def layout_page4_content(connectivity_df):
     dropdown_options = []
     for country_iso in connectivity_df["asn_country"].unique():
         russian_name = country_names_ru.get(country_iso, country_iso)
-        dropdown_options.append(
-            {"label": f"{country_iso}, {russian_name}", "value": country_iso}
-        )
+        dropdown_options.append({"label": f"{country_iso}, {russian_name}", "value": country_iso})
     dropdown_options = sorted(dropdown_options, key=lambda k: k["label"])
 
-    return html.Div(
-        [
-            html.H1("Статистика глобальной связанности", style={
-                "marginBottom": "25px",
-                "fontSize": "28px",
-                "fontWeight": "600",
-                "color": "#1a1a1a"
-            }),
-            create_control_panel('page4', dropdown_options, 'ru'),
-            dcc.Graph(
-                id="time-series-graph-page4",
-                config={'responsive': True},
-                style={"width": "100%", "height": "70vh", "minHeight": "400px", "paddingLeft": "20px", "paddingRight": "20px"}
-            ),
-            dcc.Store(id='date-range-store-page4'),
-            dcc.Interval(
-                id="interval-component-page4", interval=5 * 60 * 1000, n_intervals=0
-            ),
-        ],
-        style={
-            "padding": "20px 20px",
-            "maxWidth": "100%",
-            "margin": "0 auto"
-        }
-    )
+    return html.Div([
+        create_date_picker(picker_id="global-date-picker", source_type="connectivity"),
+        html.H1("Статистика глобальной связанности"),
+        html.Div([
+            dcc.Dropdown(
+                id="country-dropdown-page4",
+                options=dropdown_options,
+                value="RU",
+                multi=False,
+                placeholder="Выберите страну",
+                closeOnSelect=True,
+                clearable=False,
+            )
+        ], style={"width": "50%", "padding": "20px"}),
+        dcc.Graph(id="time-series-graph-page4", style={"height": "600px"}),
+        dcc.Interval(id="interval-component-page4", interval=5 * 60 * 1000, n_intervals=0),
+    ])
 
 
 # Layout for Page 5 - Local Neighbours (English)
-def layout_page5_content():
-    connectivity_df = fetch_connectivity_data()
+def layout_page5_content(connectivity_df):
     dropdown_options = []
     for country_iso in connectivity_df["asn_country"].unique():
         english_name = country_names_en.get(country_iso, country_iso)
-        dropdown_options.append(
-            {"label": f"{country_iso}, {english_name}", "value": country_iso}
-        )
+        dropdown_options.append({"label": f"{country_iso}, {english_name}", "value": country_iso})
     dropdown_options = sorted(dropdown_options, key=lambda k: k["label"])
 
-    return html.Div(
-        [
-            html.H1("Local connectivity statistics", style={
-                "marginBottom": "25px",
-                "fontSize": "28px",
-                "fontWeight": "600",
-                "color": "#1a1a1a"
-            }),
-            create_control_panel('page5', dropdown_options, 'en'),
-            dcc.Graph(
-                id="time-series-graph-page5",
-                config={'responsive': True},
-                style={"width": "100%", "height": "70vh", "minHeight": "400px", "paddingLeft": "20px", "paddingRight": "20px"}
-            ),
-            dcc.Store(id='date-range-store-page5'),
-            dcc.Interval(
-                id="interval-component-page5", interval=5 * 60 * 1000, n_intervals=0
-            ),
-        ],
-        style={
-            "padding": "20px 20px",
-            "maxWidth": "100%",
-            "margin": "0 auto"
-        }
-    )
+    return html.Div([
+        create_date_picker(picker_id="global-date-picker", source_type="connectivity"),
+        html.H1("Local Connectivity Statistics"),
+        html.Div([
+            dcc.Dropdown(
+                id="country-dropdown-page5",
+                options=dropdown_options,
+                value="RU",
+                multi=False,
+                placeholder="Select a country",
+                closeOnSelect=True,
+                clearable=False,
+            )
+        ], style={"width": "50%", "padding": "20px"}),
+        dcc.Graph(id="time-series-graph-page5", style={"height": "600px"}),
+        dcc.Interval(id="interval-component-page5", interval=5 * 60 * 1000, n_intervals=0),
+    ])
 
 
 # Layout for Page 6 - Local Neighbours (Russian)
-def layout_page6_content():
-    connectivity_df = fetch_connectivity_data()
+def layout_page6_content(connectivity_df):
     dropdown_options = []
     for country_iso in connectivity_df["asn_country"].unique():
         russian_name = country_names_ru.get(country_iso, country_iso)
-        dropdown_options.append(
-            {"label": f"{country_iso}, {russian_name}", "value": country_iso}
-        )
+        dropdown_options.append({"label": f"{country_iso}, {russian_name}", "value": country_iso})
     dropdown_options = sorted(dropdown_options, key=lambda k: k["label"])
 
-    return html.Div(
-        [
-            html.H1("Статистика локальной связанности", style={
-                "marginBottom": "25px",
-                "fontSize": "28px",
-                "fontWeight": "600",
-                "color": "#1a1a1a"
-            }),
-            create_control_panel('page6', dropdown_options, 'ru'),
-            dcc.Graph(
-                id="time-series-graph-page6",
-                config={'responsive': True},
-                style={"width": "100%", "height": "70vh", "minHeight": "400px", "paddingLeft": "20px", "paddingRight": "20px"}
-            ),
-            dcc.Store(id='date-range-store-page6'),
-            dcc.Interval(
-                id="interval-component-page6", interval=5 * 60 * 1000, n_intervals=0
-            ),
-        ],
-        style={
-            "padding": "20px 20px",
-            "maxWidth": "100%",
-            "margin": "0 auto"
-        }
-    )
+    return html.Div([
+        create_date_picker(picker_id="global-date-picker", source_type="connectivity"),
+        html.H1("Статистика локальной связанности"),
+        html.Div([
+            dcc.Dropdown(
+                id="country-dropdown-page6",
+                options=dropdown_options,
+                value="RU",
+                multi=False,
+                placeholder="Выберите страну",
+                closeOnSelect=True,
+                clearable=False,
+            )
+        ], style={"width": "50%", "padding": "20px"}),
+        dcc.Graph(id="time-series-graph-page6", style={"height": "600px"}),
+        dcc.Interval(id="interval-component-page6", interval=5 * 60 * 1000, n_intervals=0),
+    ])
 
 
 # Layout for Page 7 - Foreign Share (English)
-def layout_page7_content():
-    connectivity_df = fetch_connectivity_data()
+def layout_page7_content(connectivity_df):
     dropdown_options = []
     for country_iso in connectivity_df["asn_country"].unique():
         english_name = country_names_en.get(country_iso, country_iso)
-        dropdown_options.append(
-            {"label": f"{country_iso}, {english_name}", "value": country_iso}
-        )
+        dropdown_options.append({"label": f"{country_iso}, {english_name}", "value": country_iso})
     dropdown_options = sorted(dropdown_options, key=lambda k: k["label"])
 
-    return html.Div(
-        [
-            html.H1("Total connectivity share", style={
-                "marginBottom": "25px",
-                "fontSize": "28px",
-                "fontWeight": "600",
-                "color": "#1a1a1a"
-            }),
-            create_control_panel('page7', dropdown_options, 'en'),
-            dcc.Graph(
-                id="time-series-graph-page7",
-                config={'responsive': True},
-                style={"width": "100%", "height": "70vh", "minHeight": "400px", "paddingLeft": "20px", "paddingRight": "20px"}
-            ),
-            dcc.Store(id='date-range-store-page7'),
-            dcc.Interval(
-                id="interval-component-page7", interval=5 * 60 * 1000, n_intervals=0
-            ),
-        ],
-        style={
-            "padding": "20px 20px",
-            "maxWidth": "100%",
-            "margin": "0 auto"
-        }
-    )
+    return html.Div([
+        create_date_picker(picker_id="global-date-picker", source_type="connectivity"),
+        html.H1("Total Connectivity Share"),
+        html.Div([
+            dcc.Dropdown(
+                id="country-dropdown-page7",
+                options=dropdown_options,
+                value="RU",
+                multi=False,
+                placeholder="Select a country",
+                closeOnSelect=True,
+                clearable=False,
+            )
+        ], style={"width": "50%", "padding": "20px"}),
+        dcc.Graph(id="time-series-graph-page7", style={"height": "600px"}),
+        dcc.Interval(id="interval-component-page7", interval=5 * 60 * 1000, n_intervals=0),
+    ])
 
 
 # Layout for Page 8 - Foreign Share (Russian)
-def layout_page8_content():
-    connectivity_df = fetch_connectivity_data()
+def layout_page8_content(connectivity_df):
     dropdown_options = []
     for country_iso in connectivity_df["asn_country"].unique():
         russian_name = country_names_ru.get(country_iso, country_iso)
-        dropdown_options.append(
-            {"label": f"{country_iso}, {russian_name}", "value": country_iso}
-        )
+        dropdown_options.append({"label": f"{country_iso}, {russian_name}", "value": country_iso})
     dropdown_options = sorted(dropdown_options, key=lambda k: k["label"])
 
-    return html.Div(
-        [
-            html.H1("Общая доля связанности", style={
-                "marginBottom": "25px",
-                "fontSize": "28px",
-                "fontWeight": "600",
-                "color": "#1a1a1a"
-            }),
-            create_control_panel('page8', dropdown_options, 'ru'),
-            dcc.Graph(
-                id="time-series-graph-page8",
-                config={'responsive': True},
-                style={"width": "100%", "height": "70vh", "minHeight": "400px", "paddingLeft": "20px", "paddingRight": "20px"}
-            ),
-            dcc.Store(id='date-range-store-page8'),
-            dcc.Interval(
-                id="interval-component-page8", interval=5 * 60 * 1000, n_intervals=0
-            ),
-        ],
-        style={
-            "padding": "20px 20px",
-            "maxWidth": "100%",
-            "margin": "0 auto"
-        }
-    )
+    return html.Div([
+        create_date_picker(picker_id="global-date-picker", source_type="connectivity"),
+        html.H1("Общая доля связанности"),
+        html.Div([
+            dcc.Dropdown(
+                id="country-dropdown-page8",
+                options=dropdown_options,
+                value="RU",
+                multi=False,
+                placeholder="Выберите страну",
+                closeOnSelect=True,
+                clearable=False,
+            )
+        ], style={"width": "50%", "padding": "20px"}),
+        dcc.Graph(id="time-series-graph-page8", style={"height": "600px"}),
+        dcc.Interval(id="interval-component-page8", interval=5 * 60 * 1000, n_intervals=0),
+    ])
 
+
+# Initial Data Fetch for Layouts
+initial_df = fetch_data()
+initial_connectivity_df = fetch_connectivity_data()
 
 app.layout = html.Div(
     [
         dcc.Location(id="url", refresh=False),
-        # Navigation menu
-        html.Div(
-            [
-                dcc.Link('ASN Stats', href='/asn-stats', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
-                html.Span(' | ', style={'padding': '0 5px'}),
-                dcc.Link('ASN Time Series', href='/asn-timeseries/RU', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
-                html.Span(' | ', style={'padding': '0 5px'}),
-                dcc.Link('Global Connectivity', href='/global-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
-                html.Span(' | ', style={'padding': '0 5px'}),
-                dcc.Link('Глобальная связанность', href='/ru/global-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
-                html.Span(' | ', style={'padding': '0 5px'}),
-                dcc.Link('Local Connectivity', href='/local-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
-                html.Span(' | ', style={'padding': '0 5px'}),
-                dcc.Link('Локальная связанность', href='/ru/local-connectivity', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
-                html.Span(' | ', style={'padding': '0 5px'}),
-                dcc.Link('Total Share', href='/total-share', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
-                html.Span(' | ', style={'padding': '0 5px'}),
-                dcc.Link('Общая доля', href='/ru/total-share', style={'padding': '10px', 'textDecoration': 'none', 'color': '#1f77b4'}),
-            ],
-            style={
-                'padding': '15px',
-                'backgroundColor': '#f8f9fa',
-                'borderBottom': '2px solid #dee2e6',
-                'textAlign': 'center'
-            }
-        ),
-        html.Div(
-            id="page-1-container",
-            children=layout_page1_content(),
-            style={"display": "none"},
-        ),
-        html.Div(
-            id="page-2-container",
-            children=layout_page2_content(),
-            style={"display": "none"},
-        ),
-        html.Div(
-            id="page-3-container",
-            children=layout_page3_content(),
-            style={"display": "none"},
-        ),
-        html.Div(
-            id="page-4-container",
-            children=layout_page4_content(),
-            style={"display": "none"},
-        ),
-        html.Div(
-            id="page-5-container",
-            children=layout_page5_content(),
-            style={"display": "none"},
-        ),
-        html.Div(
-            id="page-6-container",
-            children=layout_page6_content(),
-            style={"display": "none"},
-        ),
-        html.Div(
-            id="page-7-container",
-            children=layout_page7_content(),
-            style={"display": "none"},
-        ),
-        html.Div(
-            id="page-8-container",
-            children=layout_page8_content(),
-            style={"display": "none"},
-        ),
+        create_navbar(),
+        html.Div(id="page-content")
     ]
 )
 
 
-# Update the callback for Page 1
+# Callback to update page content based on URL
+@app.callback(Output("page-content", "children"), Input("url", "pathname"))
+def display_page(pathname):
+    if pathname == "/asn-stats" or pathname == "/" or pathname == "/page1":
+        return layout_page1_content(fetch_data())
+    elif pathname.startswith("/asn-timeseries") or pathname == "/page2":
+        return layout_page2_content(fetch_data())
+    elif pathname == "/global-connectivity" or pathname == "/page3":
+        return layout_page3_content(fetch_connectivity_data())
+    elif pathname == "/ru/global-connectivity" or pathname == "/page4":
+        return layout_page4_content(fetch_connectivity_data())
+    elif pathname == "/local-connectivity" or pathname == "/page5":
+        return layout_page5_content(fetch_connectivity_data())
+    elif pathname == "/ru/local-connectivity" or pathname == "/page6":
+        return layout_page6_content(fetch_connectivity_data())
+    elif pathname == "/total-share" or pathname == "/page7":
+        return layout_page7_content(fetch_connectivity_data())
+    elif pathname == "/ru/total-share" or pathname == "/page8":
+        return layout_page8_content(fetch_connectivity_data())
+    else:
+        # Default to Page 1
+        return layout_page1_content(fetch_data())
+
+
+# --- Callbacks for Graphs ---
+
+# Page 1 Callback
 @app.callback(
     Output("time-series-graph-page1", "figure"),
-    Output("date-range-store-page1", "data"),
-    Input("interval-component-page1", "n_intervals"),
-    Input("country-dropdown-page1", "value"),
-    Input("apply-dates-page1", "n_clicks"),
-    State("date-from-page1", "date"),
-    State("date-to-page1", "date"),
+    [Input("interval-component-page1", "n_intervals"),
+     Input("country-dropdown-page1", "value"),
+     Input("global-date-picker", "start_date"),
+     Input("global-date-picker", "end_date")]
 )
-def update_graph_page1(n_intervals, selected_country, n_clicks, date_from, date_to):
-    current_df = fetch_data()
+def update_graph_page1(n_intervals, selected_country, start_date, end_date):
+    current_df = fetch_data(start_date, end_date)
     current_df_melted = current_df.melt(
         id_vars=["cs_country_iso2", "cs_stats_timestamp"],
         value_vars=["cs_asns_ris", "cs_asns_stats"],
@@ -704,70 +602,38 @@ def update_graph_page1(n_intervals, selected_country, n_clicks, date_from, date_
     )
 
     if selected_country:
-        current_df_melted = current_df_melted[
-            current_df_melted["cs_country_iso2"] == selected_country
-        ]
-    
-    # Apply date filtering
-    if date_from and date_to:
-        current_df_melted = current_df_melted[
-            (current_df_melted["cs_stats_timestamp"] >= date_from) &
-            (current_df_melted["cs_stats_timestamp"] <= date_to)
-        ]
+        current_df_melted = current_df_melted[current_df_melted["cs_country_iso2"] == selected_country]
 
     fig = px.scatter(
         current_df_melted,
         x="cs_stats_timestamp",
         y="value",
-        color="metric",  # Color by metric to differentiate lines
-        category_orders={"metric": ["cs_asns_stats", "cs_asns_ris"]}, # Order legends
+        color="metric",
+        category_orders={"metric": ["cs_asns_stats", "cs_asns_ris"]},
         labels={
             "cs_stats_timestamp": "",
             "value": "Number of Autonomous Systems (ASN)",
             "metric": "Metric",
         },
         template="plotly_white",
-    )  # Use a light but contrasting style
-
-    fig.for_each_trace(
-        lambda t: t.update(
-            name=t.name.replace("cs_asns_ris", "ASN RIS").replace(
-                "cs_asns_stats", "ASN Stat"
-            )
-        )
-    )
-    # fig.update_traces(line=dict(width=3))  # Make lines thicker
-
-    fig.update_yaxes(rangemode="tozero")  # Ensure y-axis starts from 0
-    fig.update_layout(
-        hovermode="x unified",
-        legend_itemclick="toggleothers",
-        legend=dict(
-            x=0.5,
-            y=1.05,
-            xanchor="center",
-            yanchor="bottom",
-            orientation="h",
-            title_text="",
-        ),
     )
 
-    date_range = {"start": date_from, "end": date_to} if date_from and date_to else None
-    return fig, date_range
+    fig.for_each_trace(lambda t: t.update(name=t.name.replace("cs_asns_ris", "ASN RIS").replace("cs_asns_stats", "ASN Stat")))
+    fig.update_yaxes(rangemode="tozero")
+    fig.update_layout(hovermode="x unified", legend=dict(x=0.5, y=1.05, xanchor="center", yanchor="bottom", orientation="h"))
+    return fig
 
 
-# New callback for Page 2
+# Page 2 Callback
 @app.callback(
     Output("time-series-graph-page2", "figure"),
-    Output("date-range-store-page2", "data"),
-    Input("interval-component-page2", "n_intervals"),
-    Input("country-dropdown-page2", "value"),
-    Input("apply-dates-page2", "n_clicks"),
-    State("date-from-page2", "date"),
-    State("date-to-page2", "date"),
+    [Input("interval-component-page2", "n_intervals"),
+     Input("country-dropdown-page2-single", "value"),
+     Input("global-date-picker", "start_date"),
+     Input("global-date-picker", "end_date")]
 )
-def update_graph_page2(n_intervals, selected_country, n_clicks, date_from, date_to):
-    current_df = fetch_data()
+def update_graph_page2(n_intervals, selected_country, start_date, end_date):
+    current_df = fetch_data(start_date, end_date)
     current_df_melted = current_df.melt(
         id_vars=["cs_country_iso2", "cs_stats_timestamp"],
         value_vars=["cs_asns_ris", "cs_asns_stats"],
@@ -776,61 +642,31 @@ def update_graph_page2(n_intervals, selected_country, n_clicks, date_from, date_
     )
 
     if selected_country:
-        current_df_melted = current_df_melted[
-            current_df_melted["cs_country_iso2"] == selected_country
-        ]
-    
-    # Apply date filtering
-    if date_from and date_to:
-        current_df_melted = current_df_melted[
-            (current_df_melted["cs_stats_timestamp"] >= date_from) &
-            (current_df_melted["cs_stats_timestamp"] <= date_to)
-        ]
+        current_df_melted = current_df_melted[current_df_melted["cs_country_iso2"] == selected_country]
 
     fig = px.scatter(
         current_df_melted,
         x="cs_stats_timestamp",
         y="value",
-        color="metric",  # Color by metric to differentiate lines
-        title=f'Country Statistics Over Time - Page 2 ({selected_country if selected_country else ""}) - ASNs RIS vs Stats',
-        labels={
-            "cs_stats_timestamp": "Date",
-            "value": "Value",
-            "cs_country_iso2": "Country",
-        },
+        color="metric",
+        title=f'Country Statistics - Page 2 ({selected_country if selected_country else ""})',
+        labels={"cs_stats_timestamp": "Date", "value": "Value", "cs_country_iso2": "Country"},
         height=600,
-    )  # Adjusted height as there are no facets
-
-    fig.update_layout(
-        hovermode="x unified",
-        legend_itemclick="toggleothers",
-        legend=dict(
-            x=0.01,
-            y=0.99,
-            xanchor="left",
-            yanchor="top",
-            bgcolor="rgba(255,255,255,0.5)",
-        ),
-        yaxis_rangemode="tozero",
     )
+    fig.update_layout(hovermode="x unified", legend=dict(x=0.01, y=0.99, xanchor="left", yanchor="top", bgcolor="rgba(255,255,255,0.5)"), yaxis_rangemode="tozero")
+    return fig
 
-    date_range = {"start": date_from, "end": date_to} if date_from and date_to else None
-    return fig, date_range
 
-
-# Callback for Page 3 - Foreign Neighbours (English)
+# Page 3 Callback
 @app.callback(
     Output("time-series-graph-page3", "figure"),
-    Output("date-range-store-page3", "data"),
-    Input("interval-component-page3", "n_intervals"),
-    Input("country-dropdown-page3", "value"),
-    Input("apply-dates-page3", "n_clicks"),
-    State("date-from-page3", "date"),
-    State("date-to-page3", "date"),
+    [Input("interval-component-page3", "n_intervals"),
+     Input("country-dropdown-page3", "value"),
+     Input("global-date-picker", "start_date"),
+     Input("global-date-picker", "end_date")]
 )
-def update_graph_page3(n_intervals, selected_country, n_clicks, date_from, date_to):
-    current_df = fetch_connectivity_data()
-    
+def update_graph_page3(n_intervals, selected_country, start_date, end_date):
+    current_df = fetch_connectivity_data(start_date, end_date)
     if selected_country:
         current_df = current_df[current_df["asn_country"] == selected_country]
     
@@ -846,184 +682,25 @@ def update_graph_page3(n_intervals, selected_country, n_clicks, date_from, date_
         x="date",
         y="foreign_neighbour_count",
         color_discrete_sequence=["#4285F4"],
-        labels={
-            "date": "",
-            "foreign_neighbour_count": "Foreign Neighbours",
-        },
+        labels={"date": "", "foreign_neighbour_count": "Foreign Neighbours"},
         template="plotly_white",
     )
-    
     fig.update_traces(name="Foreign Neighbours", showlegend=False)
     fig.update_yaxes(rangemode="tozero")
     fig.update_layout(hovermode="x unified")
-    
-    # Store current date range
-    date_range = {"start": date_from, "end": date_to}
-    
-    return fig, date_range
+    return fig
 
 
-# Callback to sync date pickers when graph is zoomed - Page 1
-@app.callback(
-    Output("date-from-page1", "date"),
-    Output("date-to-page1", "date"),
-    Input("time-series-graph-page1", "relayoutData"),
-    State("date-range-store-page1", "data"),
-    prevent_initial_call=True
-)
-def sync_dates_from_graph_page1(relayout_data, current_range):
-    if relayout_data and 'xaxis.range[0]' in relayout_data and 'xaxis.range[1]' in relayout_data:
-        start_date = relayout_data['xaxis.range[0]'].split('T')[0] if 'T' in relayout_data['xaxis.range[0]'] else relayout_data['xaxis.range[0]']
-        end_date = relayout_data['xaxis.range[1]'].split('T')[0] if 'T' in relayout_data['xaxis.range[1]'] else relayout_data['xaxis.range[1]']
-        return start_date, end_date
-    if current_range:
-        return current_range.get("start"), current_range.get("end")
-    return None, None
-
-
-# Callback to sync date pickers when graph is zoomed - Page 2
-@app.callback(
-    Output("date-from-page2", "date"),
-    Output("date-to-page2", "date"),
-    Input("time-series-graph-page2", "relayoutData"),
-    State("date-range-store-page2", "data"),
-    prevent_initial_call=True
-)
-def sync_dates_from_graph_page2(relayout_data, current_range):
-    if relayout_data and 'xaxis.range[0]' in relayout_data and 'xaxis.range[1]' in relayout_data:
-        start_date = relayout_data['xaxis.range[0]'].split('T')[0] if 'T' in relayout_data['xaxis.range[0]'] else relayout_data['xaxis.range[0]']
-        end_date = relayout_data['xaxis.range[1]'].split('T')[0] if 'T' in relayout_data['xaxis.range[1]'] else relayout_data['xaxis.range[1]']
-        return start_date, end_date
-    if current_range:
-        return current_range.get("start"), current_range.get("end")
-    return None, None
-
-
-# Callback to sync date pickers when graph is zoomed - Page 3
-@app.callback(
-    Output("date-from-page3", "date"),
-    Output("date-to-page3", "date"),
-    Input("time-series-graph-page3", "relayoutData"),
-    State("date-range-store-page3", "data"),
-    prevent_initial_call=True
-)
-def sync_dates_from_graph_page3(relayout_data, current_range):
-    if relayout_data and 'xaxis.range[0]' in relayout_data and 'xaxis.range[1]' in relayout_data:
-        # Extract date range from zoom/pan
-        start_date = relayout_data['xaxis.range[0]'].split('T')[0] if 'T' in relayout_data['xaxis.range[0]'] else relayout_data['xaxis.range[0]']
-        end_date = relayout_data['xaxis.range[1]'].split('T')[0] if 'T' in relayout_data['xaxis.range[1]'] else relayout_data['xaxis.range[1]']
-        return start_date, end_date
-    
-    # Return current values if no zoom
-    if current_range:
-        return current_range.get("start"), current_range.get("end")
-    
-    return None, None
-
-
-# Callback to sync date pickers when graph is zoomed - Page 4
-@app.callback(
-    Output("date-from-page4", "date"),
-    Output("date-to-page4", "date"),
-    Input("time-series-graph-page4", "relayoutData"),
-    State("date-range-store-page4", "data"),
-    prevent_initial_call=True
-)
-def sync_dates_from_graph_page4(relayout_data, current_range):
-    if relayout_data and 'xaxis.range[0]' in relayout_data and 'xaxis.range[1]' in relayout_data:
-        start_date = relayout_data['xaxis.range[0]'].split('T')[0] if 'T' in relayout_data['xaxis.range[0]'] else relayout_data['xaxis.range[0]']
-        end_date = relayout_data['xaxis.range[1]'].split('T')[0] if 'T' in relayout_data['xaxis.range[1]'] else relayout_data['xaxis.range[1]']
-        return start_date, end_date
-    if current_range:
-        return current_range.get("start"), current_range.get("end")
-    return None, None
-
-
-# Callback to sync date pickers when graph is zoomed - Page 5
-@app.callback(
-    Output("date-from-page5", "date"),
-    Output("date-to-page5", "date"),
-    Input("time-series-graph-page5", "relayoutData"),
-    State("date-range-store-page5", "data"),
-    prevent_initial_call=True
-)
-def sync_dates_from_graph_page5(relayout_data, current_range):
-    if relayout_data and 'xaxis.range[0]' in relayout_data and 'xaxis.range[1]' in relayout_data:
-        start_date = relayout_data['xaxis.range[0]'].split('T')[0] if 'T' in relayout_data['xaxis.range[0]'] else relayout_data['xaxis.range[0]']
-        end_date = relayout_data['xaxis.range[1]'].split('T')[0] if 'T' in relayout_data['xaxis.range[1]'] else relayout_data['xaxis.range[1]']
-        return start_date, end_date
-    if current_range:
-        return current_range.get("start"), current_range.get("end")
-    return None, None
-
-
-# Callback to sync date pickers when graph is zoomed - Page 6
-@app.callback(
-    Output("date-from-page6", "date"),
-    Output("date-to-page6", "date"),
-    Input("time-series-graph-page6", "relayoutData"),
-    State("date-range-store-page6", "data"),
-    prevent_initial_call=True
-)
-def sync_dates_from_graph_page6(relayout_data, current_range):
-    if relayout_data and 'xaxis.range[0]' in relayout_data and 'xaxis.range[1]' in relayout_data:
-        start_date = relayout_data['xaxis.range[0]'].split('T')[0] if 'T' in relayout_data['xaxis.range[0]'] else relayout_data['xaxis.range[0]']
-        end_date = relayout_data['xaxis.range[1]'].split('T')[0] if 'T' in relayout_data['xaxis.range[1]'] else relayout_data['xaxis.range[1]']
-        return start_date, end_date
-    if current_range:
-        return current_range.get("start"), current_range.get("end")
-    return None, None
-
-
-# Callback to sync date pickers when graph is zoomed - Page 7
-@app.callback(
-    Output("date-from-page7", "date"),
-    Output("date-to-page7", "date"),
-    Input("time-series-graph-page7", "relayoutData"),
-    State("date-range-store-page7", "data"),
-    prevent_initial_call=True
-)
-def sync_dates_from_graph_page7(relayout_data, current_range):
-    if relayout_data and 'xaxis.range[0]' in relayout_data and 'xaxis.range[1]' in relayout_data:
-        start_date = relayout_data['xaxis.range[0]'].split('T')[0] if 'T' in relayout_data['xaxis.range[0]'] else relayout_data['xaxis.range[0]']
-        end_date = relayout_data['xaxis.range[1]'].split('T')[0] if 'T' in relayout_data['xaxis.range[1]'] else relayout_data['xaxis.range[1]']
-        return start_date, end_date
-    if current_range:
-        return current_range.get("start"), current_range.get("end")
-    return None, None
-
-
-# Callback to sync date pickers when graph is zoomed - Page 8
-@app.callback(
-    Output("date-from-page8", "date"),
-    Output("date-to-page8", "date"),
-    Input("time-series-graph-page8", "relayoutData"),
-    State("date-range-store-page8", "data"),
-    prevent_initial_call=True
-)
-def sync_dates_from_graph_page8(relayout_data, current_range):
-    if relayout_data and 'xaxis.range[0]' in relayout_data and 'xaxis.range[1]' in relayout_data:
-        start_date = relayout_data['xaxis.range[0]'].split('T')[0] if 'T' in relayout_data['xaxis.range[0]'] else relayout_data['xaxis.range[0]']
-        end_date = relayout_data['xaxis.range[1]'].split('T')[0] if 'T' in relayout_data['xaxis.range[1]'] else relayout_data['xaxis.range[1]']
-        return start_date, end_date
-    if current_range:
-        return current_range.get("start"), current_range.get("end")
-    return None, None
-
-
-# Callback for Page 4 - Foreign Neighbours (Russian)
+# Page 4 Callback
 @app.callback(
     Output("time-series-graph-page4", "figure"),
-    Output("date-range-store-page4", "data"),
-    Input("interval-component-page4", "n_intervals"),
-    Input("country-dropdown-page4", "value"),
-    Input("apply-dates-page4", "n_clicks"),
-    State("date-from-page4", "date"),
-    State("date-to-page4", "date"),
+    [Input("interval-component-page4", "n_intervals"),
+     Input("country-dropdown-page4", "value"),
+     Input("global-date-picker", "start_date"),
+     Input("global-date-picker", "end_date")]
 )
-def update_graph_page4(n_intervals, selected_country, n_clicks, date_from, date_to):
-    current_df = fetch_connectivity_data()
-    
+def update_graph_page4(n_intervals, selected_country, start_date, end_date):
+    current_df = fetch_connectivity_data(start_date, end_date)
     if selected_country:
         current_df = current_df[current_df["asn_country"] == selected_country]
     
@@ -1038,33 +715,24 @@ def update_graph_page4(n_intervals, selected_country, n_clicks, date_from, date_
         x="date",
         y="foreign_neighbour_count",
         color_discrete_sequence=["#4285F4"],
-        labels={
-            "date": "",
-            "foreign_neighbour_count": "Внешние соседи",
-        },
+        labels={"date": "", "foreign_neighbour_count": "Внешние соседи"},
     )
-    
     fig.update_traces(name="Внешние соседи", showlegend=False)
     fig.update_yaxes(rangemode="tozero")
     fig.update_layout(hovermode="x unified")
-    
-    date_range = {"start": date_from, "end": date_to} if date_from and date_to else None
-    return fig, date_range
+    return fig
 
 
-# Callback for Page 5 - Local Neighbours (English)
+# Page 5 Callback
 @app.callback(
     Output("time-series-graph-page5", "figure"),
-    Output("date-range-store-page5", "data"),
-    Input("interval-component-page5", "n_intervals"),
-    Input("country-dropdown-page5", "value"),
-    Input("apply-dates-page5", "n_clicks"),
-    State("date-from-page5", "date"),
-    State("date-to-page5", "date"),
+    [Input("interval-component-page5", "n_intervals"),
+     Input("country-dropdown-page5", "value"),
+     Input("global-date-picker", "start_date"),
+     Input("global-date-picker", "end_date")]
 )
-def update_graph_page5(n_intervals, selected_country, n_clicks, date_from, date_to):
-    current_df = fetch_connectivity_data()
-    
+def update_graph_page5(n_intervals, selected_country, start_date, end_date):
+    current_df = fetch_connectivity_data(start_date, end_date)
     if selected_country:
         current_df = current_df[current_df["asn_country"] == selected_country]
     
@@ -1079,34 +747,25 @@ def update_graph_page5(n_intervals, selected_country, n_clicks, date_from, date_
         x="date",
         y="local_neighbour_count",
         color_discrete_sequence=["#EA4335"],
-        labels={
-            "date": "",
-            "local_neighbour_count": "Local Neighbours",
-        },
+        labels={"date": "", "local_neighbour_count": "Local Neighbours"},
         template="plotly_white",
     )
-    
     fig.update_traces(name="Local Neighbours", showlegend=False)
     fig.update_yaxes(rangemode="tozero")
     fig.update_layout(hovermode="x unified")
-    
-    date_range = {"start": date_from, "end": date_to} if date_from and date_to else None
-    return fig, date_range
+    return fig
 
 
-# Callback for Page 6 - Local Neighbours (Russian)
+# Page 6 Callback
 @app.callback(
     Output("time-series-graph-page6", "figure"),
-    Output("date-range-store-page6", "data"),
-    Input("interval-component-page6", "n_intervals"),
-    Input("country-dropdown-page6", "value"),
-    Input("apply-dates-page6", "n_clicks"),
-    State("date-from-page6", "date"),
-    State("date-to-page6", "date"),
+    [Input("interval-component-page6", "n_intervals"),
+     Input("country-dropdown-page6", "value"),
+     Input("global-date-picker", "start_date"),
+     Input("global-date-picker", "end_date")]
 )
-def update_graph_page6(n_intervals, selected_country, n_clicks, date_from, date_to):
-    current_df = fetch_connectivity_data()
-    
+def update_graph_page6(n_intervals, selected_country, start_date, end_date):
+    current_df = fetch_connectivity_data(start_date, end_date)
     if selected_country:
         current_df = current_df[current_df["asn_country"] == selected_country]
     
@@ -1121,158 +780,67 @@ def update_graph_page6(n_intervals, selected_country, n_clicks, date_from, date_
         x="date",
         y="local_neighbour_count",
         color_discrete_sequence=["#EA4335"],
-        labels={
-            "date": "",
-            "local_neighbour_count": "Внутренние соседи",
-        },
+        labels={"date": "", "local_neighbour_count": "Внутренние соседи"},
         template="plotly_white",
     )
-    
     fig.update_traces(name="Внутренние соседи", showlegend=False)
     fig.update_yaxes(rangemode="tozero")
     fig.update_layout(hovermode="x unified")
-    
-    date_range = {"start": date_from, "end": date_to} if date_from and date_to else None
-    return fig, date_range
+    return fig
 
 
-# Callback for Page 7 - Foreign Share (English)
+# Page 7 Callback
 @app.callback(
     Output("time-series-graph-page7", "figure"),
-    Output("date-range-store-page7", "data"),
-    Input("interval-component-page7", "n_intervals"),
-    Input("country-dropdown-page7", "value"),
-    Input("apply-dates-page7", "n_clicks"),
-    State("date-from-page7", "date"),
-    State("date-to-page7", "date"),
+    [Input("interval-component-page7", "n_intervals"),
+     Input("country-dropdown-page7", "value"),
+     Input("global-date-picker", "start_date"),
+     Input("global-date-picker", "end_date")]
 )
-def update_graph_page7(n_intervals, selected_country, n_clicks, date_from, date_to):
-    current_df = fetch_connectivity_data()
-    
+def update_graph_page7(n_intervals, selected_country, start_date, end_date):
+    current_df = fetch_connectivity_data(start_date, end_date)
     if selected_country:
         current_df = current_df[current_df["asn_country"] == selected_country]
-    
-    if date_from and date_to:
-        current_df = current_df[
-            (current_df["date"] >= date_from) &
-            (current_df["date"] <= date_to)
-        ]
-    
-    # foreign_share_pct already in percent from view
     
     fig = px.area(
         current_df,
         x="date",
         y="foreign_share_pct",
         color_discrete_sequence=["#34A853"],
-        labels={
-            "date": "",
-            "foreign_share_pct": "Foreign Neighbours Share %",
-        },
+        labels={"date": "", "foreign_share_pct": "Foreign Neighbours Share %"},
         template="plotly_white",
     )
-    
     fig.update_traces(name="Foreign Share %", showlegend=False)
     fig.update_yaxes(rangemode="tozero")
     fig.update_layout(hovermode="x unified")
-    
-    date_range = {"start": date_from, "end": date_to} if date_from and date_to else None
-    return fig, date_range
+    return fig
 
 
-# Callback for Page 8 - Foreign Share (Russian)
+# Page 8 Callback
 @app.callback(
     Output("time-series-graph-page8", "figure"),
-    Output("date-range-store-page8", "data"),
-    Input("interval-component-page8", "n_intervals"),
-    Input("country-dropdown-page8", "value"),
-    Input("apply-dates-page8", "n_clicks"),
-    State("date-from-page8", "date"),
-    State("date-to-page8", "date"),
+    [Input("interval-component-page8", "n_intervals"),
+     Input("country-dropdown-page8", "value"),
+     Input("global-date-picker", "start_date"),
+     Input("global-date-picker", "end_date")]
 )
-def update_graph_page8(n_intervals, selected_country, n_clicks, date_from, date_to):
-    current_df = fetch_connectivity_data()
-    
+def update_graph_page8(n_intervals, selected_country, start_date, end_date):
+    current_df = fetch_connectivity_data(start_date, end_date)
     if selected_country:
         current_df = current_df[current_df["asn_country"] == selected_country]
-    
-    if date_from and date_to:
-        current_df = current_df[
-            (current_df["date"] >= date_from) &
-            (current_df["date"] <= date_to)
-        ]
-    
-    # foreign_share_pct already in percent from view
     
     fig = px.area(
         current_df,
         x="date",
         y="foreign_share_pct",
         color_discrete_sequence=["#34A853"],
-        labels={
-            "date": "",
-            "foreign_share_pct": "Доля внешних соседей %",
-        },
+        labels={"date": "", "foreign_share_pct": "Доля внешних соседей %"},
         template="plotly_white",
     )
-    
     fig.update_traces(name="Доля внешних %", showlegend=False)
     fig.update_yaxes(rangemode="tozero")
     fig.update_layout(hovermode="x unified")
-    
-    date_range = {"start": date_from, "end": date_to} if date_from and date_to else None
-    return fig, date_range
-
-
-@app.callback(
-    Output("page-1-container", "style"),
-    Output("page-2-container", "style"),
-    Output("page-3-container", "style"),
-    Output("page-4-container", "style"),
-    Output("page-5-container", "style"),
-    Output("page-6-container", "style"),
-    Output("page-7-container", "style"),
-    Output("page-8-container", "style"),
-    Input("url", "pathname"),
-)
-def display_page(pathname):
-    styles = [{"display": "none"}] * 8
-
-    if pathname == "/asn-stats" or pathname == "/page1":
-        styles[0] = {"display": "block"}
-    elif pathname.startswith("/asn-timeseries") or pathname.startswith("/page2"):
-        styles[1] = {"display": "block"}
-    elif pathname == "/global-connectivity" or pathname == "/page3":
-        styles[2] = {"display": "block"}
-    elif pathname == "/ru/global-connectivity" or pathname == "/page4":
-        styles[3] = {"display": "block"}
-    elif pathname == "/local-connectivity" or pathname == "/page5":
-        styles[4] = {"display": "block"}
-    elif pathname == "/ru/local-connectivity" or pathname == "/page6":
-        styles[5] = {"display": "block"}
-    elif pathname == "/total-share" or pathname == "/page7":
-        styles[6] = {"display": "block"}
-    elif pathname == "/ru/total-share" or pathname == "/page8":
-        styles[7] = {"display": "block"}
-    else:
-        styles[0] = {"display": "block"}  # Default to page 1
-
-    return styles[0], styles[1], styles[2], styles[3], styles[4], styles[5], styles[6], styles[7]
-
-
-# New callback to update dropdown based on URL
-@app.callback(
-    Output("country-dropdown-page2", "value"), Input("url", "pathname")
-)
-def set_dropdown_value_from_url(pathname):
-    if pathname and (pathname.startswith("/asn-timeseries/") or pathname.startswith("/page2/")):
-        parts = pathname.split("/")
-        if len(parts) > 2:
-            country_code = parts[-1].upper()  # Get last part of URL
-            if country_code in df["cs_country_iso2"].unique():
-                return country_code
-    return "RU"  # Default to RU if no country selected from URL
-
+    return fig
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8050, debug=False)
+    app.run_server(debug=True, host="0.0.0.0", port=8050)
