@@ -104,51 +104,85 @@ def get_stats_for_country(country_iso2, date_from, date_to, resolution):
         return stats
 
 
-def get_list_of_asn_neighbours_for_country(
-    country_iso2, dates, batch_size, verbose=True
-):
+def get_asn_neighbour_counts_for_country(country_iso2, dates, verbose=True):
+    """
+    For each ASN in the country, fetch neighbours from RIPE API and compute
+    total_neighbours, local_neighbours, foreign_neighbours.
+    Local = neighbour ASN is in the same country; Foreign = neighbour is in another country.
+    Yields batches of count records for loading.
+    """
     total_number_of_dates = len(dates)
-    neighbours_batch = []
-    received_from_api = 0
-    stored_to_database = 0
+    count_batch = []
+    processed_asns = 0
 
     if verbose:
         display_progress(0, total_number_of_dates, dates[0], 0, 0)
 
     while dates:
         date = dates.pop(0)
+        # Collect ALL ASNs for this country/date first (needed for correct local/foreign classification)
+        all_asns_for_date = []
         for asn_list in get_list_of_asns_for_country(
             country_iso2, [date], BATCH_SIZE, verbose=False
         ):
-            counter = 0
-            for item in asn_list:
+            all_asns_for_date.extend(asn_list)
+        local_asns = {str(item["asn"]) for item in all_asns_for_date}
+
+        for item in all_asns_for_date:
                 asn = item["asn"]
-                counter += 1
+                processed_asns += 1
                 if verbose:
                     display_progress(
-                        total_number_of_dates - len(dates) - 1,
+                        total_number_of_dates - len(dates),
                         total_number_of_dates,
                         date,
-                        received_from_api + len(neighbours_batch),
-                        stored_to_database,
-                        f"    asn {counter}/{len(asn_list)}",
+                        processed_asns,
+                        processed_asns - len(count_batch),
+                        f"    asn {asn}",
                     )
 
                 d = get_asn_neighbours(asn, date)
-                if d["data"]:
-                    for row in d["data"]["neighbours"]:
-                        row["asn_req"] = asn
-                        row["date"] = date.strftime("%Y-%m-%d")
-                        neighbours_batch.append(row)
+                if not d or not d.get("data") or not d["data"].get("neighbours"):
+                    continue
 
-                if len(neighbours_batch) >= batch_size:
-                    yield neighbours_batch
-                    stored_to_database += len(neighbours_batch)
-                    received_from_api += len(neighbours_batch)
-                    neighbours_batch = []
+                total = 0
+                local = 0
+                foreign = 0
 
-    if neighbours_batch:
-        yield neighbours_batch
+                for row in d["data"]["neighbours"]:
+                    # Only count left/right neighbours (exclude uncertain, per existing views)
+                    n_type = row.get("type") or row.get("position", "")
+                    if n_type not in ("left", "right"):
+                        continue
+
+                    neighbour_asn = str(row.get("asn", "")).strip()
+                    if not neighbour_asn:
+                        continue
+
+                    total += 1
+                    if neighbour_asn in local_asns:
+                        local += 1
+                    else:
+                        foreign += 1
+
+                if total > 0:
+                    count_batch.append(
+                        {
+                            "asn": int(asn) if str(asn).isdigit() else asn,
+                            "country_iso2": country_iso2,
+                            "date": date.strftime("%Y-%m-%d"),
+                            "total_neighbours": total,
+                            "local_neighbours": local,
+                            "foreign_neighbours": foreign,
+                        }
+                    )
+
+                if len(count_batch) >= BATCH_SIZE:
+                    yield count_batch
+                    count_batch = []
+
+    if count_batch:
+        yield count_batch
 
 
 def get_traffic_for_country(country_iso2, token):

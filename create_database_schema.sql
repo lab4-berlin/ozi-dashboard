@@ -155,31 +155,30 @@ ALTER SEQUENCE data.asn_a_id_seq OWNED BY data.asn.a_id;
 
 
 --
--- Name: asn_neighbour; Type: TABLE; Schema: data; Owner: ozi
+-- Name: asn_neighbour_count; Type: TABLE; Schema: data; Owner: ozi
 --
 
-CREATE TABLE data.asn_neighbour (
+CREATE TABLE data.asn_neighbour_count (
     created timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    "an_id" integer NOT NULL,
-    an_asn bigint NOT NULL,
-    an_neighbour bigint NOT NULL,
-    an_date timestamp without time zone NOT NULL,
-    an_type character varying(32),
-    an_power integer NOT NULL,
-    an_v4_peers integer,
-    an_v6_peers integer,
+    anc_id integer NOT NULL,
+    anc_asn bigint NOT NULL,
+    anc_country_iso2 character varying(2) NOT NULL,
+    anc_date timestamp without time zone NOT NULL,
+    anc_total_neighbours integer NOT NULL,
+    anc_local_neighbours integer NOT NULL,
+    anc_foreign_neighbours integer NOT NULL,
     load_id integer
 );
 
 
-ALTER TABLE data.asn_neighbour OWNER TO ozi;
+ALTER TABLE data.asn_neighbour_count OWNER TO ozi;
 
 --
--- Name: asn_neighbour_an_id_seq; Type: SEQUENCE; Schema: data; Owner: ozi
+-- Name: asn_neighbour_count_anc_id_seq; Type: SEQUENCE; Schema: data; Owner: ozi
 --
 
-CREATE SEQUENCE data."asn_neighbour_an_id_seq"
+CREATE SEQUENCE data.asn_neighbour_count_anc_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -188,13 +187,13 @@ CREATE SEQUENCE data."asn_neighbour_an_id_seq"
     CACHE 1;
 
 
-ALTER SEQUENCE data."asn_neighbour_an_id_seq" OWNER TO ozi;
+ALTER SEQUENCE data.asn_neighbour_count_anc_id_seq OWNER TO ozi;
 
 --
--- Name: asn_neighbour_an_id_seq; Type: SEQUENCE OWNED BY; Schema: data; Owner: ozi
+-- Name: asn_neighbour_count_anc_id_seq; Type: SEQUENCE OWNED BY; Schema: data; Owner: ozi
 --
 
-ALTER SEQUENCE data."asn_neighbour_an_id_seq" OWNED BY data.asn_neighbour."an_id";
+ALTER SEQUENCE data.asn_neighbour_count_anc_id_seq OWNED BY data.asn_neighbour_count.anc_id;
 
 
 --
@@ -455,83 +454,21 @@ CREATE MATERIALIZED VIEW data.vm_current_asn AS
 ALTER MATERIALIZED VIEW data.vm_current_asn OWNER TO ozi;
 
 --
--- Name: v_asn_neighbour; Type: VIEW; Schema: data; Owner: ozi
---
-
-CREATE VIEW data.v_asn_neighbour AS
- SELECT n.an_date,
-    n.an_asn,
-    a1.asn_country,
-    n.an_neighbour,
-    COALESCE(a2.asn_country, 'UNKNOWN'::character varying) AS neighbour_country,
-        CASE
-            WHEN ((a1.asn_country)::text <> (COALESCE(a2.asn_country, 'UNKNOWN'::character varying))::text) THEN true
-            ELSE false
-        END AS is_foreign_neighbour,
-    n.an_type,
-    n.an_power,
-    n.an_v4_peers,
-    n.an_v6_peers
-   FROM ((data.asn_neighbour n
-     LEFT JOIN data.vm_current_asn a1 ON ((a1.asn_id = n.an_asn)))
-     LEFT JOIN data.vm_current_asn a2 ON ((a2.asn_id = n.an_neighbour)))
-  WHERE ((n.an_type)::text = ANY (ARRAY[('left'::character varying)::text, ('right'::character varying)::text]));
-
-
-ALTER VIEW data.v_asn_neighbour OWNER TO ozi;
-
---
--- Name: v_asn_with_neighbours; Type: VIEW; Schema: data; Owner: ozi
---
-
-CREATE VIEW data.v_asn_with_neighbours AS
- WITH asn_with_neighbours AS (
-         SELECT asn.a_id,
-            asn.a_date,
-            asn.a_country_iso2,
-            (EXISTS ( SELECT 1
-                   FROM data.asn_neighbour
-                  WHERE ((asn_neighbour.an_asn = asn.a_id) AND (asn_neighbour.an_date = asn.a_date)))) AS has_neighbours
-           FROM data.asn
-        )
- SELECT a_country_iso2,
-    a_date,
-    count(*) AS total_asns,
-    count(has_neighbours) AS asns_with_neighbours,
-    ((count(has_neighbours))::double precision / (count(*))::double precision) AS share_asns_with_neighbours
-   FROM asn_with_neighbours
-  GROUP BY a_country_iso2, a_date;
-
-
-ALTER VIEW data.v_asn_with_neighbours OWNER TO ozi;
-
---
 -- Name: v_connectivity_index_by_asn; Type: VIEW; Schema: data; Owner: ozi
 --
 
 CREATE VIEW data.v_connectivity_index_by_asn AS
- SELECT an_asn,
-    an_date,
-    asn_country,
-    sum(
-        CASE
-            WHEN is_foreign_neighbour THEN 1
-            ELSE 0
-        END) AS foreign_neighbour_count,
-    sum(
-        CASE
-            WHEN (NOT is_foreign_neighbour) THEN 1
-            ELSE 0
-        END) AS local_neighbour_count,
-    count(*) AS total_neighbour_count,
-    ((sum(
-        CASE
-            WHEN is_foreign_neighbour THEN 1
-            ELSE 0
-        END))::double precision / (count(*))::double precision) AS foreign_neighbours_share
-   FROM data.v_asn_neighbour
-  WHERE (asn_country IS NOT NULL)
-  GROUP BY an_asn, an_date, asn_country;
+ SELECT anc_asn AS an_asn,
+    anc_date AS an_date,
+    anc_country_iso2 AS asn_country,
+    anc_foreign_neighbours AS foreign_neighbours,
+    anc_local_neighbours AS local_neighbours,
+    anc_total_neighbours AS total_neighbours,
+    CASE
+        WHEN anc_total_neighbours > 0 THEN (anc_foreign_neighbours::double precision / anc_total_neighbours::double precision)
+        ELSE 0::double precision
+    END AS foreign_neighbours_share
+   FROM data.asn_neighbour_count;
 
 
 ALTER VIEW data.v_connectivity_index_by_asn OWNER TO ozi;
@@ -544,19 +481,19 @@ CREATE VIEW data.v_connectivity_index_by_asn_top10 AS
  SELECT an_asn,
     an_date,
     asn_country,
-    foreign_neighbour_count,
-    local_neighbour_count,
-    total_neighbour_count,
+    foreign_neighbours,
+    local_neighbours,
+    total_neighbours,
     foreign_neighbours_share,
     rn
    FROM ( SELECT v_connectivity_index_by_asn.an_asn,
             v_connectivity_index_by_asn.an_date,
             v_connectivity_index_by_asn.asn_country,
-            v_connectivity_index_by_asn.foreign_neighbour_count,
-            v_connectivity_index_by_asn.local_neighbour_count,
-            v_connectivity_index_by_asn.total_neighbour_count,
+            v_connectivity_index_by_asn.foreign_neighbours,
+            v_connectivity_index_by_asn.local_neighbours,
+            v_connectivity_index_by_asn.total_neighbours,
             v_connectivity_index_by_asn.foreign_neighbours_share,
-            row_number() OVER (PARTITION BY v_connectivity_index_by_asn.asn_country, v_connectivity_index_by_asn.an_date ORDER BY v_connectivity_index_by_asn.total_neighbour_count DESC) AS rn
+            row_number() OVER (PARTITION BY v_connectivity_index_by_asn.asn_country, v_connectivity_index_by_asn.an_date ORDER BY v_connectivity_index_by_asn.total_neighbours DESC) AS rn
            FROM data.v_connectivity_index_by_asn) sub
   WHERE (rn <= 10);
 
@@ -568,28 +505,18 @@ ALTER VIEW data.v_connectivity_index_by_asn_top10 OWNER TO ozi;
 --
 
 CREATE VIEW data.v_connectivity_index_by_country AS
- SELECT asn_country,
-    an_date AS date,
-    count(DISTINCT an_asn) AS asn_count,
-    sum(
-        CASE
-            WHEN is_foreign_neighbour THEN 1
-            ELSE 0
-        END) AS foreign_neighbour_count,
-    sum(
-        CASE
-            WHEN (NOT is_foreign_neighbour) THEN 1
-            ELSE 0
-        END) AS local_neighbour_count,
-    count(*) AS total_neighbour_count,
-    ((sum(
-        CASE
-            WHEN is_foreign_neighbour THEN 1
-            ELSE 0
-        END))::double precision / (count(*))::double precision) AS foreign_neighbours_share
-   FROM data.v_asn_neighbour
-  WHERE (asn_country IS NOT NULL)
-  GROUP BY asn_country, an_date;
+ SELECT anc_country_iso2 AS asn_country,
+    anc_date AS date,
+    count(DISTINCT anc_asn) AS asn_count,
+    sum(anc_foreign_neighbours) AS foreign_neighbours,
+    sum(anc_local_neighbours) AS local_neighbours,
+    sum(anc_total_neighbours) AS total_neighbours,
+    CASE
+        WHEN sum(anc_total_neighbours) > 0 THEN (sum(anc_foreign_neighbours)::double precision / sum(anc_total_neighbours)::double precision)
+        ELSE 0::double precision
+    END AS foreign_neighbours_share
+   FROM data.asn_neighbour_count
+  GROUP BY anc_country_iso2, anc_date;
 
 
 ALTER VIEW data.v_connectivity_index_by_country OWNER TO ozi;
@@ -599,35 +526,46 @@ ALTER VIEW data.v_connectivity_index_by_country OWNER TO ozi;
 --
 
 CREATE VIEW data.v_connectivity_index_distinct AS
- SELECT asn_country,
-    an_date AS date,
-    count(DISTINCT an_asn) AS asn_count,
-    sum(
-        CASE
-            WHEN is_foreign_neighbour THEN 1
-            ELSE 0
-        END) AS foreign_neighbour_count,
-    sum(
-        CASE
-            WHEN NOT is_foreign_neighbour THEN 1
-            ELSE 0
-        END) AS local_neighbour_count,
-    count(*) AS total_neighbour_count,
-    round(sum(
-        CASE
-            WHEN is_foreign_neighbour THEN 1
-            ELSE 0
-        END)::double precision / NULLIF(count(*), 0)::double precision * 100::double precision) AS foreign_share_pct
-   FROM ( SELECT DISTINCT v_asn_neighbour.an_asn,
-            v_asn_neighbour.an_neighbour,
-            v_asn_neighbour.an_date,
-            v_asn_neighbour.asn_country,
-            v_asn_neighbour.is_foreign_neighbour
-           FROM data.v_asn_neighbour) deduplicated
-  GROUP BY asn_country, an_date;
+ SELECT anc_country_iso2 AS asn_country,
+    anc_date AS date,
+    count(DISTINCT anc_asn) AS asn_count,
+    sum(anc_foreign_neighbours) AS foreign_neighbours,
+    sum(anc_local_neighbours) AS local_neighbours,
+    sum(anc_total_neighbours) AS total_neighbours,
+    round(CASE
+        WHEN sum(anc_total_neighbours) > 0 THEN (sum(anc_foreign_neighbours)::double precision / sum(anc_total_neighbours)::double precision * 100::double precision)
+        ELSE 0::double precision
+    END) AS foreign_share_pct
+   FROM data.asn_neighbour_count
+  GROUP BY anc_country_iso2, anc_date;
 
 
 ALTER VIEW data.v_connectivity_index_distinct OWNER TO ozi;
+
+--
+-- Name: v_asn_with_neighbours; Type: VIEW; Schema: data; Owner: ozi
+--
+
+CREATE VIEW data.v_asn_with_neighbours AS
+ WITH asn_with_neighbours AS (
+         SELECT asn.a_id,
+            asn.a_date,
+            asn.a_country_iso2,
+            (EXISTS ( SELECT 1
+                   FROM data.asn_neighbour_count
+                  WHERE ((asn_neighbour_count.anc_asn = asn.a_ripe_id) AND (asn_neighbour_count.anc_country_iso2 = asn.a_country_iso2) AND (asn_neighbour_count.anc_date = asn.a_date)))) AS has_neighbours
+           FROM data.asn
+        )
+ SELECT a_country_iso2,
+    a_date,
+    count(*) AS total_asns,
+    count(has_neighbours) AS asns_with_neighbours,
+    ((count(has_neighbours))::double precision / (count(*))::double precision) AS share_asns_with_neighbours
+   FROM asn_with_neighbours
+  GROUP BY a_country_iso2, a_date;
+
+
+ALTER VIEW data.v_asn_with_neighbours OWNER TO ozi;
 
 --
 -- Name: v_country_stat_1d; Type: VIEW; Schema: data; Owner: ozi
@@ -756,10 +694,10 @@ CREATE VIEW data.v_data_overview AS
             count(*) AS cnt
            FROM data.asn
           GROUP BY asn.a_date) a ON ((d.date = a.a_date)))
-     LEFT JOIN ( SELECT asn_neighbour.an_date,
+     LEFT JOIN ( SELECT asn_neighbour_count.anc_date,
             count(*) AS cnt
-           FROM data.asn_neighbour
-          GROUP BY asn_neighbour.an_date) n ON ((d.date = n.an_date)))
+           FROM data.asn_neighbour_count
+          GROUP BY asn_neighbour_count.anc_date) n ON ((d.date = n.anc_date)))
      LEFT JOIN ( SELECT country_internet_quality.ci_date,
             country_internet_quality.ci_country_iso2,
             count(*) AS cnt
@@ -781,41 +719,6 @@ CREATE VIEW data.v_data_overview AS
 ALTER VIEW data.v_data_overview OWNER TO ozi;
 
 --
--- Name: v_neighbours_by_country; Type: VIEW; Schema: data; Owner: ozi
---
-
-CREATE VIEW data.v_neighbours_by_country AS
- SELECT asn_country,
-    neighbour_country,
-    count(*) AS neighbours_count
-   FROM data.v_asn_neighbour
-  GROUP BY asn_country, neighbour_country;
-
-
-ALTER VIEW data.v_neighbours_by_country OWNER TO ozi;
-
---
--- Name: vm_asn_neighbour; Type: MATERIALIZED VIEW; Schema: data; Owner: ozi
---
-
-CREATE MATERIALIZED VIEW data.vm_asn_neighbour AS
- SELECT an_date,
-    an_asn,
-    asn_country,
-    an_neighbour,
-    neighbour_country,
-    is_foreign_neighbour,
-    an_type,
-    an_power,
-    an_v4_peers,
-    an_v6_peers
-   FROM data.v_asn_neighbour
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW data.vm_asn_neighbour OWNER TO ozi;
-
---
 -- Name: vm_connectivity_index_by_asn_top10; Type: MATERIALIZED VIEW; Schema: data; Owner: ozi
 --
 
@@ -823,9 +726,9 @@ CREATE MATERIALIZED VIEW data.vm_connectivity_index_by_asn_top10 AS
  SELECT an_asn,
     an_date,
     asn_country,
-    foreign_neighbour_count,
-    local_neighbour_count,
-    total_neighbour_count,
+    foreign_neighbours,
+    local_neighbours,
+    total_neighbours,
     foreign_neighbours_share,
     rn
    FROM data.v_connectivity_index_by_asn_top10
@@ -842,9 +745,9 @@ CREATE MATERIALIZED VIEW data.vm_connectivity_index_by_country AS
  SELECT asn_country,
     date,
     asn_count,
-    foreign_neighbour_count,
-    local_neighbour_count,
-    total_neighbour_count,
+    foreign_neighbours,
+    local_neighbours,
+    total_neighbours,
     foreign_neighbours_share
    FROM data.v_connectivity_index_by_country
   WITH NO DATA;
@@ -898,10 +801,10 @@ ALTER TABLE ONLY data.asn ALTER COLUMN a_id SET DEFAULT nextval('data.asn_a_id_s
 
 
 --
--- Name: asn_neighbour an_id; Type: DEFAULT; Schema: data; Owner: ozi
+-- Name: asn_neighbour_count anc_id; Type: DEFAULT; Schema: data; Owner: ozi
 --
 
-ALTER TABLE ONLY data.asn_neighbour ALTER COLUMN "an_id" SET DEFAULT nextval('data."asn_neighbour_an_id_seq"'::regclass);
+ALTER TABLE ONLY data.asn_neighbour_count ALTER COLUMN anc_id SET DEFAULT nextval('data.asn_neighbour_count_anc_id_seq'::regclass);
 
 
 --
@@ -947,12 +850,14 @@ ALTER TABLE ONLY source.api_response ALTER COLUMN ar_id SET DEFAULT nextval('sou
 
 
 --
--- Name: asn_neighbour asn_neighbour_pkey; Type: CONSTRAINT; Schema: data; Owner: ozi
+-- Name: asn_neighbour_count asn_neighbour_count_pkey; Type: CONSTRAINT; Schema: data; Owner: ozi
 --
 
-ALTER TABLE ONLY data.asn_neighbour
-    ADD CONSTRAINT asn_neighbour_pkey PRIMARY KEY ("an_id");
+ALTER TABLE ONLY data.asn_neighbour_count
+    ADD CONSTRAINT asn_neighbour_count_pkey PRIMARY KEY (anc_id);
 
+CREATE UNIQUE INDEX idx_asn_neighbour_count_unique ON data.asn_neighbour_count (anc_asn, anc_country_iso2, anc_date);
+CREATE INDEX idx_asn_neighbour_count_country_date ON data.asn_neighbour_count (anc_country_iso2, anc_date);
 
 --
 -- Name: asn asn_pkey; Type: CONSTRAINT; Schema: data; Owner: ozi
@@ -1104,11 +1009,15 @@ ALTER TABLE ONLY data.asn
 
 
 --
--- Name: asn_neighbour asn_neighbour_load_id_fkey; Type: FK CONSTRAINT; Schema: data; Owner: ozi
+-- Name: asn_neighbour_count asn_neighbour_count_load_id_fkey; Type: FK CONSTRAINT; Schema: data; Owner: ozi
 --
 
-ALTER TABLE ONLY data.asn_neighbour
-    ADD CONSTRAINT asn_neighbour_load_id_fkey FOREIGN KEY (load_id) REFERENCES data.etl_load(load_id);
+ALTER TABLE ONLY data.asn_neighbour_count
+    ADD CONSTRAINT asn_neighbour_count_load_id_fkey FOREIGN KEY (load_id) REFERENCES data.etl_load(load_id);
+
+CREATE TRIGGER trigger_set_timestamps_asn_neighbour_count
+    BEFORE INSERT OR UPDATE ON data.asn_neighbour_count
+    FOR EACH ROW EXECUTE FUNCTION data.set_timestamps();
 
 
 --

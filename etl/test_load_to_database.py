@@ -6,7 +6,7 @@ import os
 from load_to_database import (
     insert_country_asns_to_db,
     insert_country_stats_to_db,
-    insert_country_asn_neighbours_to_db,
+    insert_asn_neighbour_counts_to_db,
     insert_traffic_for_country_to_db,
     insert_internet_quality_for_country_to_db,
 )
@@ -52,7 +52,7 @@ class TestLoadToDatabase(unittest.TestCase):
         with self.engine.connect() as connection:
             connection.execute(text("TRUNCATE TABLE data.asn CASCADE;"))
             connection.execute(text("TRUNCATE TABLE data.country_stat CASCADE;"))
-            connection.execute(text("TRUNCATE TABLE data.asn_neighbour CASCADE;"))
+            connection.execute(text("TRUNCATE TABLE data.asn_neighbour_count CASCADE;"))
             connection.execute(text("TRUNCATE TABLE data.country_traffic CASCADE;"))
             connection.execute(
                 text("TRUNCATE TABLE data.country_internet_quality CASCADE;")
@@ -149,68 +149,67 @@ class TestLoadToDatabase(unittest.TestCase):
             )
             self.assertEqual([ts[0] for ts in stats_in_db], expected_timestamps)
 
-    def test_insert_country_asn_neighbours_to_db_no_duplicates(self):
-        country_iso2 = "JP"
-        neighbours = [
+    def test_insert_asn_neighbour_counts_to_db_no_duplicates(self):
+        count_records = [
             {
-                "asn_req": 1,
                 "asn": 123,
+                "country_iso2": "JP",
                 "date": "2023-01-01",
-                "type": "peer",
-                "power": 10,
-                "v4_peers": 5,
-                "v6_peers": 5,
+                "total_neighbours": 10,
+                "local_neighbours": 3,
+                "foreign_neighbours": 7,
             },
             {
-                "asn_req": 2,
                 "asn": 456,
+                "country_iso2": "JP",
                 "date": "2023-01-01",
-                "type": "cust",
-                "power": 20,
-                "v4_peers": 10,
-                "v6_peers": 10,
+                "total_neighbours": 5,
+                "local_neighbours": 2,
+                "foreign_neighbours": 3,
             },
         ]
 
-        insert_country_asn_neighbours_to_db(country_iso2, neighbours)
-        insert_country_asn_neighbours_to_db(
-            country_iso2, neighbours
-        )  # Attempt to insert duplicates
+        insert_asn_neighbour_counts_to_db(count_records)
+        insert_asn_neighbour_counts_to_db(count_records)  # Attempt to insert duplicates
 
         with self.engine.connect() as connection:
             result = connection.execute(
-                text("SELECT COUNT(*) FROM data.asn_neighbour;")
+                text("SELECT COUNT(*) FROM data.asn_neighbour_count;")
             ).scalar()
-            self.assertEqual(result, len(neighbours))
+            self.assertEqual(result, len(count_records))
 
-            # Verify content (simplified check)
-            neighbours_in_db = connection.execute(
+            # Verify content
+            counts_in_db = connection.execute(
                 text(
-                    "SELECT an_asn, an_neighbour, an_date, an_type FROM data.asn_neighbour ORDER BY an_asn, an_neighbour;"
+                    "SELECT anc_asn, anc_country_iso2, anc_date, anc_total_neighbours, anc_local_neighbours, anc_foreign_neighbours "
+                    "FROM data.asn_neighbour_count ORDER BY anc_asn;"
                 )
             ).fetchall()
-            expected_neighbours = sorted(
+            expected = sorted(
                 [
                     (
-                        item["asn_req"],
                         item["asn"],
+                        item["country_iso2"],
                         datetime.strptime(item["date"], "%Y-%m-%d").date(),
-                        item["type"],
+                        item["total_neighbours"],
+                        item["local_neighbours"],
+                        item["foreign_neighbours"],
                     )
-                    for item in neighbours
+                    for item in count_records
                 ]
             )
-            # Convert datetime.datetime to datetime.date for comparison
-            neighbours_in_db_dates_converted = [
+            counts_converted = [
                 (
-                    asn_req,
                     asn,
-                    date.date() if isinstance(date, datetime) else date,
-                    type,
+                    ciso,
+                    d.date() if isinstance(d, datetime) else d,
+                    total,
+                    local,
+                    foreign,
                 )
-                for asn_req, asn, date, type in neighbours_in_db
+                for asn, ciso, d, total, local, foreign in counts_in_db
             ]
-            self.assertEqual(neighbours_in_db_dates_converted, expected_neighbours)
+            self.assertEqual(counts_converted, expected)
 
     def test_insert_traffic_for_country_to_db_no_duplicates(self):
         country_iso2 = "BR"

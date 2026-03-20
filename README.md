@@ -149,19 +149,24 @@ To run the `pull_request` workflow defined in `.github/workflows/ci.yml` locally
 act pull_request
 ```
 
-## Running Daily STATS_1D Job
+## Running Daily ETL Jobs
 
-The daily STATS_1D ETL job is now scheduled and managed via a GitHub Actions workflow. This workflow automatically fetches the latest STATS_1D data. The job:
+The daily ETL is scheduled via a GitHub Actions workflow (`.github/workflows/etl_daily_stats.yml`). It runs:
 
-1. Determines the last date in the database
-2. Runs the ETL job from that date to today
-3. Prevents duplicate data by only inserting new records
+1. **STATS_1D** – for all countries, from the last date in DB to today (incremental)
+2. **ASN_NEIGHBOURS** – for all countries, for yesterday’s date (aggregated neighbour counts)
 
-The workflow is configured to run daily at 2:00 AM UTC.
+The workflow runs daily at 2:00 AM UTC. To trigger it manually: Actions → ETL Daily Stats → Run workflow.
 
-You can find the workflow definition at `.github/workflows/etl_daily_stats.yml`.
+## Migration: asn_neighbour → asn_neighbour_count
 
-To manually trigger this job, you can navigate to the "Actions" tab in your GitHub repository, select the "ETL Daily Stats" workflow, and click "Run workflow".
+If you have an existing database with the old `asn_neighbour` table, run the migration before deploying:
+
+```sh
+psql -h localhost -U postgres -d ozi_db2 -f migrations/001_asn_neighbour_to_asn_neighbour_count.sql
+```
+
+This replaces the per-neighbour table with `asn_neighbour_count`, which stores only aggregated counts (total, local, foreign) per ASN per date.
 
 ## Stopping Services
 

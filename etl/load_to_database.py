@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.sql.functions import current_date
 from sqlalchemy import text
+from sqlalchemy.sql import bindparam
 
 HOST = os.getenv("POSTGRES_HOST", "localhost")
 PORT = os.getenv("POSTGRES_PORT", "5432")
@@ -196,56 +197,73 @@ def insert_country_stats_to_db(
             c.commit()
 
 
-def insert_country_asn_neighbours_to_db(
-    country_iso2, neighbours, save_sql_to_file=False, load_to_database=True
+def insert_asn_neighbour_counts_to_db(
+    count_records, save_sql_to_file=False, load_to_database=True
 ):
-    if not neighbours:
+    """Insert ASN neighbour count records (total, local, foreign) into asn_neighbour_count."""
+    if not count_records:
         return
 
+    country_iso2 = count_records[0]["country_iso2"]
+    unique_dates = list(set(item["date"] for item in count_records))
+
     with get_db_connection() as c:
-        # Fetch existing ASN neighbours for the given country and dates
-        existing_neighbours_query = text(
-            f"""
-            SELECT an_asn, an_neighbour, an_date, an_type
-            FROM data.asn_neighbour
-            WHERE an_date IN ({', '.join([f"'{item['date']}'" for item in neighbours])})
-        """
+        stmt = text(
+            """
+            SELECT anc_asn, anc_country_iso2, anc_date
+            FROM data.asn_neighbour_count
+            WHERE anc_country_iso2 = :country_iso2
+            AND anc_date IN :dates
+            """
+        ).bindparams(bindparam("dates", expanding=True))
+        existing_result = c.execute(
+            stmt, {"country_iso2": country_iso2, "dates": unique_dates}
+        ).fetchall()
+        existing_set = set(
+            (asn, ciso, d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d))
+            for asn, ciso, d in existing_result
         )
 
-        existing_neighbours_result = c.execute(existing_neighbours_query).fetchall()
-        existing_neighbours_set = set(
-            (asn, neighbour, date.strftime("%Y-%m-%d"), type)
-            for asn, neighbour, date, type in existing_neighbours_result
+    new_to_insert = [
+        item
+        for item in count_records
+        if (item["asn"], item["country_iso2"], item["date"]) not in existing_set
+    ]
+
+    if not new_to_insert:
+        return
+
+    # Use parameterized query - build values with proper bindparams
+    values_parts = []
+    params = {}
+    for i, item in enumerate(new_to_insert):
+        values_parts.append(
+            f"(:asn_{i}, :country_{i}, :date_{i}, :total_{i}, :local_{i}, :foreign_{i})"
         )
+        params[f"asn_{i}"] = item["asn"]
+        params[f"country_{i}"] = item["country_iso2"]
+        params[f"date_{i}"] = item["date"]
+        params[f"total_{i}"] = item["total_neighbours"]
+        params[f"local_{i}"] = item["local_neighbours"]
+        params[f"foreign_{i}"] = item["foreign_neighbours"]
 
-        # Filter out neighbours that already exist
-        new_neighbours_to_insert = [
-            item
-            for item in neighbours
-            if (item["asn_req"], item["asn"], item["date"], item["type"])
-            not in existing_neighbours_set
-        ]
-
-        if not new_neighbours_to_insert:
-            return
-
-    sql = "INSERT INTO data.asn_neighbour (an_asn, an_neighbour, an_date, an_type, an_power, an_v4_peers, an_v6_peers)\n VALUES "
-    values_list = []
-    for item in new_neighbours_to_insert:
-        values_list.append(
-            f"({item['asn_req']}, {item['asn']}, '{item['date']}', '{item['type']}', {item['power']}, {item['v4_peers']}, {item['v6_peers']})"
-        )
-    sql += ",\n".join(values_list) + ";"
+    sql = (
+        "INSERT INTO data.asn_neighbour_count "
+        "(anc_asn, anc_country_iso2, anc_date, anc_total_neighbours, anc_local_neighbours, anc_foreign_neighbours)\n"
+        "VALUES "
+        + ",\n".join(values_parts)
+    )
 
     if save_sql_to_file:
-        filename = f"sql/asn_neighbours_{country_iso2}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
+        os.makedirs("sql", exist_ok=True)
+        filename = f"sql/asn_neighbour_counts_{country_iso2}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
         with open(filename, "w") as f:
-            print(sql, file=f)
+            f.write(f"-- {len(new_to_insert)} records\n")
+            f.write(sql + "\n")
 
     if load_to_database:
         with get_db_connection() as c:
-            query = text(sql)
-            c.execute(query)
+            c.execute(text(sql), params)
             c.commit()
 
 
