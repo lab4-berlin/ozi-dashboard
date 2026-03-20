@@ -63,20 +63,23 @@ class TestETLJobs(unittest.TestCase):
             iso2, "5m", [{"stat": "some"}], save_sql_to_file=False
         )
 
-    @patch(f"{MODULE_DB}.insert_country_asn_neighbours_to_db")
-    @patch(f"{MODULE_JOBS}.get_list_of_asn_neighbours_for_country")
-    def test_etl_load_asn_neighbours(self, mock_get_neighbours, mock_insert_neighbours):
+    @patch(f"{MODULE_DB}.insert_asn_neighbour_counts_to_db")
+    @patch(f"{MODULE_JOBS}.get_asn_neighbour_counts_for_country")
+    def test_etl_load_asn_neighbours(self, mock_get_counts, mock_insert_counts):
         iso2 = "JP"
         dates = [datetime(2023, 1, 1), datetime(2023, 1, 2)]
 
-        mock_get_neighbours.return_value = [["N1", "N2"], ["N3"]]
+        mock_get_counts.return_value = [
+            [{"asn": 1, "country_iso2": "JP", "date": "2023-01-01", "total_neighbours": 5, "local_neighbours": 2, "foreign_neighbours": 3}],
+            [{"asn": 2, "country_iso2": "JP", "date": "2023-01-01", "total_neighbours": 3, "local_neighbours": 1, "foreign_neighbours": 2}],
+        ]
 
         etl_load_asn_neighbours(iso2, dates)
 
-        mock_get_neighbours.assert_called_once_with(iso2, dates, ANY)
-        self.assertEqual(mock_insert_neighbours.call_count, 2)
-        mock_insert_neighbours.assert_any_call(iso2, ["N1", "N2"])
-        mock_insert_neighbours.assert_any_call(iso2, ["N3"])
+        mock_get_counts.assert_called_once_with(iso2, dates)
+        self.assertEqual(mock_insert_counts.call_count, 2)
+        mock_insert_counts.assert_any_call(mock_get_counts.return_value[0])
+        mock_insert_counts.assert_any_call(mock_get_counts.return_value[1])
 
     @patch(f"{MODULE_DB}.insert_traffic_for_country_to_db")
     @patch(f"{MODULE_JOBS}.get_traffic_for_country")

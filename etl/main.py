@@ -1,5 +1,13 @@
 import argparse
-from load_to_database import *
+import os
+from load_to_database import (
+    insert_country_asns_to_db,
+    insert_country_stats_to_db,
+    insert_asn_neighbour_counts_to_db,
+    insert_traffic_for_country_to_db,
+    insert_internet_quality_for_country_to_db,
+    BATCH_SIZE,
+)
 from country_lists import *
 from etl_jobs import get_internet_quality_for_country
 from datetime import datetime, timedelta
@@ -7,7 +15,7 @@ from datetime import datetime, timedelta
 from etl_jobs import (
     get_list_of_asns_for_country,
     get_stats_for_country,
-    get_list_of_asn_neighbours_for_country,
+    get_asn_neighbour_counts_for_country,
     get_traffic_for_country,
 )
 
@@ -158,11 +166,9 @@ def etl_load_stats_5m(iso2, dates, save_to_file=False):
 
 
 def etl_load_asn_neighbours(iso2, dates):
-    print(f"{'Getting data from the API and storing to DB...':<50}")
-    for neighbours_batch in get_list_of_asn_neighbours_for_country(
-        iso2, dates, BATCH_SIZE
-    ):
-        insert_country_asn_neighbours_to_db(iso2, neighbours_batch)
+    print(f"{'Getting neighbour counts from the API and storing to DB...':<50}")
+    for count_batch in get_asn_neighbour_counts_for_country(iso2, dates):
+        insert_asn_neighbour_counts_to_db(count_batch)
 
 
 def etl_load_traffic(iso2, dates, save_to_file=False):

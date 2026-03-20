@@ -104,9 +104,9 @@ def fetch_connectivity_data(start_date=None, end_date=None):
                     asn_country,
                     date,
                     asn_count,
-                    foreign_neighbour_count,
-                    local_neighbour_count,
-                    total_neighbour_count,
+                    foreign_neighbours,
+                    local_neighbours,
+                    total_neighbours,
                     foreign_share_pct
                  FROM data.v_connectivity_index_distinct
                  ORDER BY date;"""
@@ -680,9 +680,9 @@ def update_graph_page3(n_intervals, selected_country, start_date, end_date):
     fig = px.area(
         current_df,
         x="date",
-        y="foreign_neighbour_count",
+        y="foreign_neighbours",
         color_discrete_sequence=["#4285F4"],
-        labels={"date": "", "foreign_neighbour_count": "Foreign Neighbours"},
+        labels={"date": "", "foreign_neighbours": "Foreign Neighbours"},
         template="plotly_white",
     )
     fig.update_traces(name="Foreign Neighbours", showlegend=False)
@@ -713,9 +713,9 @@ def update_graph_page4(n_intervals, selected_country, start_date, end_date):
     fig = px.area(
         current_df,
         x="date",
-        y="foreign_neighbour_count",
+        y="foreign_neighbours",
         color_discrete_sequence=["#4285F4"],
-        labels={"date": "", "foreign_neighbour_count": "Внешние соседи"},
+        labels={"date": "", "foreign_neighbours": "Внешние соседи"},
     )
     fig.update_traces(name="Внешние соседи", showlegend=False)
     fig.update_yaxes(rangemode="tozero")
@@ -745,9 +745,9 @@ def update_graph_page5(n_intervals, selected_country, start_date, end_date):
     fig = px.area(
         current_df,
         x="date",
-        y="local_neighbour_count",
+        y="local_neighbours",
         color_discrete_sequence=["#EA4335"],
-        labels={"date": "", "local_neighbour_count": "Local Neighbours"},
+        labels={"date": "", "local_neighbours": "Local Neighbours"},
         template="plotly_white",
     )
     fig.update_traces(name="Local Neighbours", showlegend=False)
@@ -778,9 +778,9 @@ def update_graph_page6(n_intervals, selected_country, start_date, end_date):
     fig = px.area(
         current_df,
         x="date",
-        y="local_neighbour_count",
+        y="local_neighbours",
         color_discrete_sequence=["#EA4335"],
-        labels={"date": "", "local_neighbour_count": "Внутренние соседи"},
+        labels={"date": "", "local_neighbours": "Внутренние соседи"},
         template="plotly_white",
     )
     fig.update_traces(name="Внутренние соседи", showlegend=False)
