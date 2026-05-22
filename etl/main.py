@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 from load_to_database import *
 from country_lists import *
 from etl_jobs import get_internet_quality_for_country
@@ -50,6 +51,11 @@ def main():
         action="store_true",
         help="Save generated SQL to file (default: False)",
     )
+    parser.add_argument(
+        "--async-ripe",
+        action="store_true",
+        help="Use the async RIPE client (httpx + connection pool) for ASN_NEIGHBOURS.",
+    )
 
     args = parser.parse_args()
     task = args.task
@@ -96,6 +102,8 @@ def main():
 
         if task in ["STATS_5M", "TRAFFIC", "INTERNET_QUALITY"]:
             task_map[task](iso2, dates.copy(), save_to_file=args.save_to_file)
+        elif task == "ASN_NEIGHBOURS" and args.async_ripe:
+            etl_load_asn_neighbours_async(iso2, dates.copy())
         else:
             task_map[task](iso2, dates.copy())
 
@@ -163,6 +171,23 @@ def etl_load_asn_neighbours(iso2, dates):
         iso2, dates, BATCH_SIZE
     ):
         insert_country_asn_neighbours_to_db(iso2, neighbours_batch)
+
+
+def etl_load_asn_neighbours_async(iso2, dates):
+    print(f"{'Getting data from the API (async) and storing to DB...':<50}")
+    from etl_jobs_async import get_list_of_asn_neighbours_for_country_async
+    from extract_from_ripe_api_async import aclose_client
+
+    async def _run():
+        try:
+            async for neighbours_batch in get_list_of_asn_neighbours_for_country_async(
+                iso2, dates, BATCH_SIZE
+            ):
+                insert_country_asn_neighbours_to_db(iso2, neighbours_batch)
+        finally:
+            await aclose_client()
+
+    asyncio.run(_run())
 
 
 def etl_load_traffic(iso2, dates, save_to_file=False):
