@@ -63,9 +63,10 @@ class TestETLJobs(unittest.TestCase):
             iso2, "5m", [{"stat": "some"}], save_sql_to_file=False
         )
 
+    @patch("main.insert_country_asn_neighbours_to_s3")
     @patch(f"{MODULE_DB}.insert_country_asn_neighbours_to_db")
     @patch(f"{MODULE_JOBS}.get_list_of_asn_neighbours_for_country")
-    def test_etl_load_asn_neighbours(self, mock_get_neighbours, mock_insert_neighbours):
+    def test_etl_load_asn_neighbours(self, mock_get_neighbours, mock_insert_neighbours, mock_insert_s3):
         iso2 = "JP"
         dates = [datetime(2023, 1, 1), datetime(2023, 1, 2)]
 
@@ -77,6 +78,8 @@ class TestETLJobs(unittest.TestCase):
         self.assertEqual(mock_insert_neighbours.call_count, 2)
         mock_insert_neighbours.assert_any_call(iso2, ["N1", "N2"])
         mock_insert_neighbours.assert_any_call(iso2, ["N3"])
+        mock_insert_s3.assert_any_call(iso2, ["N1", "N2"])
+        mock_insert_s3.assert_any_call(iso2, ["N3"])
 
     @patch(f"{MODULE_DB}.insert_traffic_for_country_to_db")
     @patch(f"{MODULE_JOBS}.get_traffic_for_country")

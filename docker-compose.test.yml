@@ -1,28 +1,41 @@
 services:
   ozi-postgres:
     volumes:
-      - ozi_pgdata_volume:/var/lib/postgresql/data
-      - ./init_test_data.sql:/docker-entrypoint-initdb.d/99_init_test_data.sql:ro
-      
-
+    - ozi_pgdata_volume:/var/lib/postgresql/data
+    - ./init_test_data.sql:/docker-entrypoint-initdb.d/99_init_test_data.sql:ro
   ozi-etl:
     build:
       context: ./etl
       dockerfile: Dockerfile.test
-
   plotly-dash-app:
     ports:
-      - "8050:8050"
-    restart: "no"
-
+    - 8050:8050
+    restart: 'no'
   nginx:
-    # Disable nginx for test environment
-    # It will not be started when using docker-compose.test.yml
-    image: alpine/git # Use a dummy image to prevent starting the actual nginx service
-    command: ["tail", "-f", "/dev/null"]
-    ports: [] # Ensure no ports are exposed
-    networks: [] # Ensure no networks are connected
-    depends_on: [] # Ensure no dependencies
-
+    image: alpine/git
+    command:
+    - tail
+    - -f
+    - /dev/null
+    ports: []
+    networks: []
+    depends_on: []
+  minio:
+    image: minio/minio
+    container_name: ozi_minio_test
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    command: server /data
+    volumes:
+    - minio_test_data:/data
+  createbuckets:
+    image: minio/mc
+    depends_on:
+    - minio
+    entrypoint: "/bin/sh -c \"\n      /usr/bin/mc config host add myminio http://minio:9000\
+      \ admin password123;\n      /usr/bin/mc mb myminio/neighbours --ignore-existing;\n\
+      \      exit 0;\n      \""
 volumes:
-  ozi_pgdata_volume:
+  ozi_pgdata_volume: null
+  minio_test_data: null

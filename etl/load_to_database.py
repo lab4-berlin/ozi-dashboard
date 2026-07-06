@@ -5,6 +5,60 @@ from sqlalchemy import create_engine
 from sqlalchemy.sql.functions import current_date
 from sqlalchemy import text
 
+import os
+import json
+import boto3
+from io import BytesIO
+
+# S3 Configuration
+S3_ENDPOINT = os.getenv("S3_ENDPOINT_URL", "http://minio:9000")
+S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY_ID", "admin")
+S3_SECRET_KEY = os.getenv("S3_SECRET_ACCESS_KEY", "password123")
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "neighbours")
+S3_REGION = os.getenv("S3_REGION", "us-east-1")
+
+def get_s3_client():
+    return boto3.client(
+        's3',
+        endpoint_url=S3_ENDPOINT,
+        aws_access_key_id=S3_ACCESS_KEY,
+        aws_secret_access_key=S3_SECRET_KEY,
+        region_name=S3_REGION,
+    )
+
+def insert_country_asn_neighbours_to_s3(country_iso2, neighbours):
+    if not neighbours:
+        return
+
+    s3 = get_s3_client()
+
+    # We will upload a JSONL file per batch to avoid conflicts and make it easy to process
+    # Format: s3://neighbours/country_iso2/date/timestamp.jsonl
+
+    # Group by date to upload them in sensible partitions
+    from collections import defaultdict
+    import time
+
+    by_date = defaultdict(list)
+    for n in neighbours:
+        by_date[n['date']].append(n)
+
+    timestamp = int(time.time() * 1000)
+
+    for date, items in by_date.items():
+        jsonl_data = "\n".join(json.dumps(item) for item in items)
+        object_key = f"{country_iso2}/{date}/{timestamp}.jsonl"
+
+        try:
+            s3.put_object(
+                Bucket=S3_BUCKET_NAME,
+                Key=object_key,
+                Body=jsonl_data.encode('utf-8')
+            )
+        except Exception as e:
+            print(f"Failed to upload neighbours to S3: {e}")
+
+
 HOST = os.getenv("POSTGRES_HOST", "localhost")
 PORT = os.getenv("POSTGRES_PORT", "5432")
 USER = os.getenv("POSTGRES_OZI_USER", "ozi")
