@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 from load_to_database import *
+from load_to_database import insert_country_asn_neighbours_to_s3
 from country_lists import *
 from etl_jobs import get_internet_quality_for_country
 from datetime import datetime, timedelta
@@ -171,6 +172,7 @@ def etl_load_asn_neighbours(iso2, dates):
         iso2, dates, BATCH_SIZE
     ):
         insert_country_asn_neighbours_to_db(iso2, neighbours_batch)
+        insert_country_asn_neighbours_to_s3(iso2, neighbours_batch)
 
 
 def etl_load_asn_neighbours_async(iso2, dates):
@@ -184,6 +186,7 @@ def etl_load_asn_neighbours_async(iso2, dates):
                 iso2, dates, BATCH_SIZE
             ):
                 insert_country_asn_neighbours_to_db(iso2, neighbours_batch)
+                insert_country_asn_neighbours_to_s3(iso2, neighbours_batch)
         finally:
             await aclose_client()
 

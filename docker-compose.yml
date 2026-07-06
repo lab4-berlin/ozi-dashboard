@@ -2,7 +2,7 @@ services:
   ozi-postgres:
     image: postgres:17-alpine
     env_file:
-      - .env.ozi
+    - .env.ozi
     container_name: ozi_postgres
     restart: always
     environment:
@@ -13,23 +13,24 @@ services:
       POSTGRES_HOST_AUTH_METHOD: password
       POSTGRES_DB: ${POSTGRES_DB:-db}
     volumes:
-      - ./create_database_schema.sql:/docker-entrypoint-initdb.d/01_create_database_schema.sql:ro
-      - ./insert_countries.sql:/docker-entrypoint-initdb.d/02_insert_countries.sql:ro
-      - ./ozi_pgdata:/var/lib/postgresql/data
+    - ./create_database_schema.sql:/docker-entrypoint-initdb.d/01_create_database_schema.sql:ro
+    - ./insert_countries.sql:/docker-entrypoint-initdb.d/02_insert_countries.sql:ro
+    - ./ozi_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ozi_db2}"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ozi_db2}
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - ozi_network
-
+    - ozi_network
   ozi-etl:
     build:
       context: ./etl
       dockerfile: Dockerfile
     env_file:
-      - .env.ozi
+    - .env.ozi
     container_name: ozi_etl
     depends_on:
       ozi-postgres:
@@ -39,17 +40,16 @@ services:
       PYTHONPATH: /app
       POSTGRES_HOST: ozi-postgres
     volumes:
-      - ./etl/logs:/app/etl/logs
+    - ./etl/logs:/app/etl/logs
     networks:
-      - ozi_network
-
+    - ozi_network
   plotly-dash-app:
     build:
       context: ./plotly_dash
       dockerfile: Dockerfile
     container_name: plotly_dash_app
     env_file:
-      - .env.ozi
+    - .env.ozi
     restart: always
     depends_on:
       ozi-postgres:
@@ -59,37 +59,35 @@ services:
       DASH_DB_PORT: 5432
       DASH_DB_NAME: ${POSTGRES_DB:-ozi_db2}
     volumes:
-      - ./generated_graphs:/app/generated_graphs
+    - ./generated_graphs:/app/generated_graphs
     networks:
-      - ozi_network
-
+    - ozi_network
   nginx:
     image: nginx:alpine
     container_name: ozi_nginx
     restart: always
     ports:
-      - "80:80"
-      - "443:443"
+    - 80:80
+    - 443:443
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./certbot_etc:/etc/letsencrypt:ro # Mount Certbot configuration and certificates
-      - certbot_webroot:/var/www/certbot # Add this line for Certbot challenges
+    - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    - ./certbot_etc:/etc/letsencrypt:ro
+    - certbot_webroot:/var/www/certbot
     depends_on:
-      - plotly-dash-app
+    - plotly-dash-app
     networks:
-      - ozi_network
-
+    - ozi_network
   redash-server:
     image: redash/redash:25.1.0
     profiles:
-      - redash
+    - redash
     command: server
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+    - host.docker.internal:host-gateway
     ports:
-      - "5000:5000"
+    - 5000:5000
     env_file:
-      - .env.redash
+    - .env.redash
     environment:
       PYTHONUNBUFFERED: 0
       REDASH_COOKIE_SECRET: ${REDASH_COOKIE_SECRET:-secret}
@@ -98,59 +96,78 @@ services:
       REDASH_LOG_LEVEL: INFO
       REDASH_DATABASE_URL: postgresql://postgres:${REDASH_POSTGRES_PASSWORD:-password}@redash-postgres/postgres
     depends_on:
-      - redash-postgres
-      - redash-redis
+    - redash-postgres
+    - redash-redis
     restart: unless-stopped
     networks:
-      - ozi_network
-
+    - ozi_network
   redash-worker:
     image: redash/redash:25.1.0
     profiles:
-      - redash
+    - redash
     command: worker
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+    - host.docker.internal:host-gateway
     env_file:
-      - .env.redash
+    - .env.redash
     environment:
       PYTHONUNBUFFERED: 0
       REDASH_LOG_LEVEL: INFO
       REDASH_REDIS_URL: redis://redash-redis:6379/0
       REDASH_DATABASE_URL: postgresql://postgres:${REDASH_POSTGRES_PASSWORD:-password}@redash-postgres/postgres
     depends_on:
-      - redash-postgres
-      - redash-redis
+    - redash-postgres
+    - redash-redis
     restart: unless-stopped
     networks:
-      - ozi_network
-
+    - ozi_network
   redash-postgres:
     image: postgres:17-alpine
     profiles:
-      - redash
+    - redash
     env_file:
-      - .env.redash
+    - .env.redash
     environment:
       POSTGRES_PASSWORD: ${REDASH_POSTGRES_PASSWORD:-password}
     volumes:
-      - ./redash-pgdata:/var/lib/postgresql/data
+    - ./redash-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
-      - ozi_network
-
+    - ozi_network
   redash-redis:
     image: redis:7.0-alpine
     profiles:
-      - redash
+    - redash
     restart: unless-stopped
     networks:
-      - ozi_network
-
+    - ozi_network
+  minio:
+    image: minio/minio
+    container_name: ozi_minio
+    ports:
+    - 9000:9000
+    - 9001:9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password123}
+    command: server /data --console-address ":9001"
+    volumes:
+    - minio_data:/data
+    networks:
+    - ozi_network
+  createbuckets:
+    image: minio/mc
+    depends_on:
+    - minio
+    entrypoint: "/bin/sh -c \"\n      /usr/bin/mc config host add myminio http://minio:9000\
+      \ ${MINIO_ROOT_USER:-admin} ${MINIO_ROOT_PASSWORD:-password123};\n      /usr/bin/mc\
+      \ mb myminio/neighbours --ignore-existing;\n      exit 0;\n      \""
+    networks:
+    - ozi_network
 volumes:
-  pgdata:
-  certbot_webroot: # Define the new named volume
-
+  pgdata: null
+  certbot_webroot: null
+  minio_data: null
 networks:
   ozi_network:
     driver: bridge
