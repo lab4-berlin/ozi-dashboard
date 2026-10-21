@@ -30,7 +30,12 @@ class TestLoadToLake(unittest.TestCase):
         from common.lake import get_lake_connection
 
         init_sqlite_wal(self.catalog_path)
-        self.con = get_lake_connection(role="writer", read_only=False)
+        self.con = get_lake_connection(
+            role="writer",
+            read_only=False,
+            catalog_path=self.catalog_path,
+            data_path=self.data_path,
+        )
         configure_catalog_options(self.con)
         apply_schema(self.con, os.path.join(ROOT_DIR, "lake_schema.sql"))
         seed_countries(self.con, os.path.join(ROOT_DIR, "insert_countries.sql"))
@@ -39,6 +44,8 @@ class TestLoadToLake(unittest.TestCase):
         if hasattr(self, "con"):
             self.con.close()
         shutil.rmtree(self.test_dir, ignore_errors=True)
+        os.environ.pop("OZI_LAKE_CATALOG", None)
+        os.environ.pop("OZI_LAKE_DATA_PATH", None)
 
     def test_country_seed(self):
         count = self.con.execute("SELECT count(*) FROM data.country;").fetchone()[0]

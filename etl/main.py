@@ -32,7 +32,10 @@ from etl_jobs import (
 )
 
 CLOUDFLARE_API_TOKEN = os.getenv("OZI_CLOUDFLARE_API_TOKEN")
-OZI_STORAGE_BACKEND = os.getenv("OZI_STORAGE_BACKEND", "both").lower()
+
+
+def get_storage_backend():
+    return os.getenv("OZI_STORAGE_BACKEND", "postgres").lower()
 
 RESOLUTION_DICT = {"D": "daily", "W": "weekly", "M": "Monthly"}
 
@@ -179,7 +182,8 @@ def main():
         print(f"{'Date From:':<12} {date_from_formatted}")
         print(f"{'Date To:':<12} {date_to_formatted}")
         print(f"{'Resolution:':<12} {RESOLUTION_DICT[resolution]}")
-        print(f"{'Backend:':<12} {OZI_STORAGE_BACKEND}")
+        backend = get_storage_backend()
+        print(f"{'Backend:':<12} {backend}")
 
         if task in ["STATS_5M", "TRAFFIC", "INTERNET_QUALITY"]:
             task_map[task](iso2, dates.copy(), save_to_file=args.save_to_file)
@@ -222,52 +226,56 @@ def generate_dates(date_from, date_to, resolution):
 
 def etl_load_asns(iso2, dates):
     print(f"{'Getting data from the API and storing to DB...':<50}")
+    backend = get_storage_backend()
     load_id = generate_load_id()
     for asns_batch in get_list_of_asns_for_country(iso2, dates, BATCH_SIZE):
-        if OZI_STORAGE_BACKEND in ("postgres", "both"):
+        if backend in ("postgres", "both"):
             insert_country_asns_to_db(iso2, asns_batch)
-        if OZI_STORAGE_BACKEND in ("lake", "both"):
+        if backend in ("lake", "both"):
             insert_country_asns_to_lake(iso2, asns_batch, load_id=load_id)
 
 
 def etl_load_stats_1d(iso2, dates):
     all_stats = []
+    backend = get_storage_backend()
     load_id = generate_load_id()
     for date in dates:
         stats = get_stats_for_country(iso2, date, date, "1d")
         if stats:
             all_stats.extend(stats)
-            if OZI_STORAGE_BACKEND in ("postgres", "both"):
+            if backend in ("postgres", "both"):
                 insert_country_stats_to_db(iso2, "1d", stats, save_sql_to_file=True)
 
     # Batch insert to lake across all dates in 1 clean transaction
-    if all_stats and OZI_STORAGE_BACKEND in ("lake", "both"):
+    if all_stats and backend in ("lake", "both"):
         insert_country_stats_to_lake(iso2, "1d", all_stats, load_id=load_id)
 
 
 def etl_load_stats_5m(iso2, dates, save_to_file=False):
     years = sorted(set(date.year for date in dates))
+    backend = get_storage_backend()
     load_id = generate_load_id()
     for year in years:
         date_from = datetime(year, 1, 1)
         date_to = datetime(year + 1, 1, 1)
         stats = get_stats_for_country(iso2, date_from, date_to, "5m")
         if stats:
-            if OZI_STORAGE_BACKEND in ("postgres", "both"):
+            if backend in ("postgres", "both"):
                 insert_country_stats_to_db(iso2, "5m", stats, save_sql_to_file=save_to_file)
-            if OZI_STORAGE_BACKEND in ("lake", "both"):
+            if backend in ("lake", "both"):
                 insert_country_stats_to_lake(iso2, "5m", stats, load_id=load_id)
 
 
 def etl_load_asn_neighbours(iso2, dates):
     print(f"{'Getting data from the API and storing to DB...':<50}")
+    backend = get_storage_backend()
     load_id = generate_load_id()
     for neighbours_batch in get_list_of_asn_neighbours_for_country(
         iso2, dates, BATCH_SIZE
     ):
-        if OZI_STORAGE_BACKEND in ("postgres", "both"):
+        if backend in ("postgres", "both"):
             insert_country_asn_neighbours_to_db(iso2, neighbours_batch)
-        if OZI_STORAGE_BACKEND in ("lake", "both"):
+        if backend in ("lake", "both"):
             insert_country_asn_neighbours_to_lake(iso2, neighbours_batch, load_id=load_id)
 
 
@@ -276,6 +284,7 @@ def etl_load_asn_neighbours_async(iso2, dates):
     from etl_jobs_async import get_list_of_asn_neighbours_for_country_async
     from extract_from_ripe_api_async import aclose_client
 
+    backend = get_storage_backend()
     load_id = generate_load_id()
 
     async def _run():
@@ -283,9 +292,9 @@ def etl_load_asn_neighbours_async(iso2, dates):
             async for neighbours_batch in get_list_of_asn_neighbours_for_country_async(
                 iso2, dates, BATCH_SIZE
             ):
-                if OZI_STORAGE_BACKEND in ("postgres", "both"):
+                if backend in ("postgres", "both"):
                     insert_country_asn_neighbours_to_db(iso2, neighbours_batch)
-                if OZI_STORAGE_BACKEND in ("lake", "both"):
+                if backend in ("lake", "both"):
                     insert_country_asn_neighbours_to_lake(iso2, neighbours_batch, load_id=load_id)
         finally:
             await aclose_client()
@@ -296,22 +305,24 @@ def etl_load_asn_neighbours_async(iso2, dates):
 def etl_load_traffic(iso2, dates, save_to_file=False):
     traffic = get_traffic_for_country(iso2, CLOUDFLARE_API_TOKEN)
     if traffic:
+        backend = get_storage_backend()
         load_id = generate_load_id()
-        if OZI_STORAGE_BACKEND in ("postgres", "both"):
+        if backend in ("postgres", "both"):
             insert_traffic_for_country_to_db(iso2, traffic, save_sql_to_file=save_to_file)
-        if OZI_STORAGE_BACKEND in ("lake", "both"):
+        if backend in ("lake", "both"):
             insert_traffic_for_country_to_lake(iso2, traffic, load_id=load_id)
 
 
 def etl_load_internet_quality(iso2, dates, save_to_file=False):
     internet_quality = get_internet_quality_for_country(iso2, CLOUDFLARE_API_TOKEN)
     if internet_quality:
+        backend = get_storage_backend()
         load_id = generate_load_id()
-        if OZI_STORAGE_BACKEND in ("postgres", "both"):
+        if backend in ("postgres", "both"):
             insert_internet_quality_for_country_to_db(
                 iso2, internet_quality, save_sql_to_file=save_to_file
             )
-        if OZI_STORAGE_BACKEND in ("lake", "both"):
+        if backend in ("lake", "both"):
             insert_internet_quality_for_country_to_lake(
                 iso2, internet_quality, load_id=load_id
             )

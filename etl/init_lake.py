@@ -9,15 +9,10 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from common.lake import (
-    OZI_LAKE_CATALOG,
-    OZI_LAKE_DATA_PATH,
-    OZI_S3_ENDPOINT,
-    OZI_S3_BUCKET,
-    OZI_S3_ACCESS_KEY_ID,
-    OZI_S3_SECRET_ACCESS_KEY,
-    OZI_S3_REGION,
-    OZI_S3_USE_SSL,
+    DEFAULT_LAKE_CATALOG,
+    DEFAULT_LAKE_DATA_PATH,
     get_lake_connection,
+    get_s3_config,
     assert_lake_settings,
 )
 
@@ -39,11 +34,14 @@ def init_sqlite_wal(catalog_path):
         conn.close()
 
 
-def ensure_s3_bucket():
+def ensure_s3_bucket(data_path=None):
     """Idempotently checks and creates target S3 bucket if targeting object storage."""
-    if not OZI_LAKE_DATA_PATH.startswith("s3://"):
+    if data_path is None:
+        data_path = os.getenv("OZI_LAKE_DATA_PATH", DEFAULT_LAKE_DATA_PATH)
+
+    if not data_path.startswith("s3://"):
         # Local filesystem path
-        local_dir = OZI_LAKE_DATA_PATH.replace("file://", "")
+        local_dir = data_path.replace("file://", "")
         os.makedirs(local_dir, exist_ok=True)
         print(f"Target is local filesystem: {local_dir}")
         return
@@ -52,36 +50,36 @@ def ensure_s3_bucket():
         import boto3
         from botocore.exceptions import ClientError
 
-        protocol = "https" if OZI_S3_USE_SSL else "http"
-        endpoint_host = OZI_S3_ENDPOINT.replace("http://", "").replace("https://", "")
-        endpoint_url = f"{protocol}://{endpoint_host}"
+        s3_cfg = get_s3_config()
+        protocol = "https" if s3_cfg["use_ssl"] else "http"
+        endpoint_url = f"{protocol}://{s3_cfg['endpoint_host']}"
+        bucket_name = s3_cfg["bucket"]
 
-        print(f"Verifying S3 bucket '{OZI_S3_BUCKET}' at {endpoint_url}...")
+        print(f"Verifying S3 bucket '{bucket_name}' at {endpoint_url}...")
         s3 = boto3.client(
             "s3",
             endpoint_url=endpoint_url,
-            aws_access_key_id=OZI_S3_ACCESS_KEY_ID,
-            aws_secret_access_key=OZI_S3_SECRET_ACCESS_KEY,
-            region_name=OZI_S3_REGION,
-            use_ssl=OZI_S3_USE_SSL,
+            aws_access_key_id=s3_cfg["key_id"],
+            aws_secret_access_key=s3_cfg["secret"],
+            region_name=s3_cfg["region"],
+            use_ssl=s3_cfg["use_ssl"],
         )
 
         try:
-            s3.head_bucket(Bucket=OZI_S3_BUCKET)
-            print(f"S3 bucket '{OZI_S3_BUCKET}' exists.")
+            s3.head_bucket(Bucket=bucket_name)
+            print(f"S3 bucket '{bucket_name}' exists.")
         except ClientError as e:
             error_code = str(e.response.get("Error", {}).get("Code", ""))
             if error_code in ("404", "NoSuchBucket"):
-                print(f"Bucket '{OZI_S3_BUCKET}' not found. Creating...")
-                # Hetzner and MinIO handle default or location constraints
+                print(f"Bucket '{bucket_name}' not found. Creating...")
                 try:
-                    s3.create_bucket(Bucket=OZI_S3_BUCKET)
+                    s3.create_bucket(Bucket=bucket_name)
                 except Exception:
                     s3.create_bucket(
-                        Bucket=OZI_S3_BUCKET,
-                        CreateBucketConfiguration={"LocationConstraint": OZI_S3_REGION},
+                        Bucket=bucket_name,
+                        CreateBucketConfiguration={"LocationConstraint": s3_cfg["region"]},
                     )
-                print(f"S3 bucket '{OZI_S3_BUCKET}' created successfully.")
+                print(f"S3 bucket '{bucket_name}' created successfully.")
             else:
                 print(f"Notice: S3 head_bucket response: {e}. Proceeding.")
     except ImportError:
@@ -160,11 +158,12 @@ def seed_countries(con, seed_path):
 
 
 def main():
+    catalog_path = os.getenv("OZI_LAKE_CATALOG", DEFAULT_LAKE_CATALOG)
     schema_path = os.path.join(ROOT_DIR, "lake_schema.sql")
     seed_path = os.path.join(ROOT_DIR, "insert_countries.sql")
 
     # Step 1: Initialize SQLite WAL mode
-    init_sqlite_wal(OZI_LAKE_CATALOG)
+    init_sqlite_wal(catalog_path)
 
     # Step 2: Ensure S3 bucket exists
     ensure_s3_bucket()

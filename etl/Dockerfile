@@ -17,6 +17,8 @@ RUN python3 -c "import duckdb; con = duckdb.connect(); con.execute(\"SET extensi
 # Copy common package and etl directory content into container
 COPY common /app/common
 COPY etl /app/etl/
+COPY lake_schema.sql /app/lake_schema.sql
+COPY insert_countries.sql /app/insert_countries.sql
 
 RUN mkdir -p /app/etl/logs
 
