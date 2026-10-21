@@ -15,8 +15,28 @@ from country_lists import ALL_COUNTRIES
 def get_last_date_from_db():
     """
     Get the last date in the country_stat table for STATS_1D data.
+    Queries DuckLake if available, falling back to PostgreSQL.
     Returns a date object or None if no data exists.
     """
+    catalog_path = os.getenv("OZI_LAKE_CATALOG", "/data/ozi_lake.sqlite")
+    storage_backend = os.getenv("OZI_STORAGE_BACKEND", "both").lower()
+
+    if storage_backend in ("lake", "both") and os.path.exists(catalog_path):
+        try:
+            from common.lake import get_lake_connection
+            con = get_lake_connection(role="reader", read_only=True)
+            try:
+                result = con.execute(
+                    "SELECT MAX(cs_stats_timestamp) FROM data.country_stat WHERE cs_stats_resolution = '1d';"
+                ).fetchone()
+                if result and result[0]:
+                    val = result[0]
+                    return val.date() if hasattr(val, "date") else val
+            finally:
+                con.close()
+        except Exception as e:
+            print(f"Notice: DuckLake query fallback in get_last_date_from_db: {e}", file=sys.stderr)
+
     try:
         # Import the shared engine from load_to_database
         sys.path.append("/app/etl")

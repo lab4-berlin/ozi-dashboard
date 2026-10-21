@@ -19,6 +19,41 @@ CACHE_TTL_SECONDS = 300  # Cache will be considered stale after 5 minutes (was 6
 DATE_RANGE_CACHE_TTL = 600  # Date ranges cache for 10 minutes
 
 
+def run_query_df(query):
+    """
+    Executes a query returning a pandas DataFrame.
+    Reads from DuckLake via Arrow if configured/available, otherwise falls back to PostgreSQL.
+    """
+    catalog_path = os.environ.get("OZI_LAKE_CATALOG", "/data/ozi_lake.sqlite")
+    storage_backend = os.environ.get("OZI_STORAGE_BACKEND", "both").lower()
+
+    if storage_backend in ("lake", "both") and os.path.exists(catalog_path):
+        try:
+            from common.lake import get_lake_connection
+            con = get_lake_connection(role="reader", read_only=True)
+            try:
+                # Zero-copy Arrow streaming fetch directly to pandas
+                return con.execute(query).arrow().to_pandas()
+            finally:
+                con.close()
+        except Exception as e:
+            print(f"Notice: DuckLake query fallback to Postgres ({e})")
+
+    # PostgreSQL connection
+    db_url = (
+        f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
+        f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
+        f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
+        f"{os.environ.get('DASH_DB_PORT', '5432')}/"
+        f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
+    )
+    engine = sqlalchemy.create_engine(db_url)
+    try:
+        return pd.read_sql(query, engine)
+    finally:
+        engine.dispose()
+
+
 def fetch_data(start_date=None, end_date=None):
     global last_data_fetch_time, cached_df, country_names_ru, country_names_en
 
@@ -32,29 +67,21 @@ def fetch_data(start_date=None, end_date=None):
         df = cached_df
     else:
         print("Fetching new data from database...")
-        db_url = (
-            f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
-            f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
-            f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
-            f"{os.environ.get('DASH_DB_PORT', '5432')}/"
-            f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
-        )
-        engine = sqlalchemy.create_engine(db_url)
 
-        # Fetch country statistics data
+        # Fetch country statistics data with explicit 1d resolution filter
         query_stats = """SELECT
                     cs_country_iso2,
                     cs_stats_timestamp,
                     cs_asns_ris,
                     cs_asns_stats
                  FROM data.country_stat
+                 WHERE cs_stats_resolution = '1d'
                  ORDER BY cs_stats_timestamp;"""
-        df = pd.read_sql(query_stats, engine)
+        df = run_query_df(query_stats)
 
         # Fetch country names in Russian and English
         query_countries = "SELECT c_iso2, c_name_ru, c_name FROM data.country;"
-        df_countries = pd.read_sql(query_countries, engine)
-        engine.dispose()
+        df_countries = run_query_df(query_countries)
 
         # Populate country_names_ru and country_names_en dictionaries
         country_names_ru = {
@@ -91,14 +118,6 @@ def fetch_connectivity_data(start_date=None, end_date=None):
         df = cached_connectivity_df
     else:
         print("Fetching connectivity data from database...")
-        db_url = (
-            f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
-            f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
-            f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
-            f"{os.environ.get('DASH_DB_PORT', '5432')}/"
-            f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
-        )
-        engine = sqlalchemy.create_engine(db_url)
 
         query = """SELECT 
                     asn_country,
@@ -110,8 +129,7 @@ def fetch_connectivity_data(start_date=None, end_date=None):
                     foreign_share_pct
                  FROM data.v_connectivity_index_distinct
                  ORDER BY date;"""
-        df = pd.read_sql(query, engine)
-        engine.dispose()
+        df = run_query_df(query)
 
         # Update cache and timestamp
         cached_connectivity_df = df
@@ -228,22 +246,14 @@ def get_available_date_range(source_type='combined'):
         return cached_date_ranges[cache_key]
     
     try:
-        db_url = (
-            f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
-            f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
-            f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
-            f"{os.environ.get('DASH_DB_PORT', '5432')}/"
-            f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
-        )
-        engine = sqlalchemy.create_engine(db_url)
-        
-        # Choose query based on source type
+        # Choose query based on source type (filtered to 1d resolution to prevent 5m horizon bleed)
         if source_type == 'stats':
             query = """
                 SELECT 
                     MIN(cs_stats_timestamp::date) as min_date,
                     MAX(cs_stats_timestamp::date) as max_date
                 FROM data.country_stat
+                WHERE cs_stats_resolution = '1d'
             """
         elif source_type == 'connectivity':
             query = """
@@ -258,14 +268,13 @@ def get_available_date_range(source_type='combined'):
                     MIN(date_col) as min_date,
                     MAX(date_col) as max_date
                 FROM (
-                    SELECT cs_stats_timestamp::date as date_col FROM data.country_stat
+                    SELECT cs_stats_timestamp::date as date_col FROM data.country_stat WHERE cs_stats_resolution = '1d'
                     UNION ALL
                     SELECT date::date as date_col FROM data.v_connectivity_index_distinct
                 ) combined_dates
             """
         
-        result = pd.read_sql(query, engine)
-        engine.dispose()
+        result = run_query_df(query)
         
         if not result.empty and result['min_date'].iloc[0] is not None:
             min_date = pd.to_datetime(result['min_date'].iloc[0]).date()

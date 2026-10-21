@@ -7,8 +7,14 @@ services:
 
   ozi-etl:
     build:
-      context: ./etl
-      dockerfile: Dockerfile.test
+      context: .
+      dockerfile: etl/Dockerfile.test
+    environment:
+      OZI_STORAGE_BACKEND: postgres
+    volumes:
+      - ./etl:/app/etl
+      - ./lake_schema.sql:/app/lake_schema.sql:ro
+      - ./insert_countries.sql:/app/insert_countries.sql:ro
 
   plotly-dash-app:
     ports:

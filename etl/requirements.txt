@@ -13,3 +13,6 @@ tenacity==9.0.0
 typing_extensions==4.12.2
 urllib3==2.2.3
 pyyaml
+duckdb>=1.5.2
+boto3>=1.34.0
+
