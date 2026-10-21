@@ -8,7 +8,8 @@ services:
   ozi-etl:
     build:
       context: ./etl
-      dockerfile: Dockerfile.test
+      dockerfile: Dockerfile
+      target: test
 
   plotly-dash-app:
     ports:
@@ -16,13 +17,9 @@ services:
     restart: "no"
 
   nginx:
-    # Disable nginx for test environment
-    # It will not be started when using docker-compose.test.yml
-    image: alpine/git # Use a dummy image to prevent starting the actual nginx service
-    command: ["tail", "-f", "/dev/null"]
-    ports: [] # Ensure no ports are exposed
-    networks: [] # Ensure no networks are connected
-    depends_on: [] # Ensure no dependencies
+    profiles:
+      - donotstart
+
 
 volumes:
   ozi_pgdata_volume:
