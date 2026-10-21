@@ -25,7 +25,7 @@ jobs:
         echo "POSTGRES_DB=ozi_db2" >> .env.ozi
 
     - name: Build ETL Production Image
-      run: DOCKER_BUILDKIT=0 docker compose build ozi-etl
+      run: docker compose build ozi-etl
 
     - name: Run ETL Tests
-      run: DOCKER_BUILDKIT=0 docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --build --entrypoint "pytest" ozi-etl
+      run: docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --build --entrypoint "pytest" ozi-etl
