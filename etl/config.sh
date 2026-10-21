@@ -8,4 +8,8 @@ read -s OZI_DATABASE_PASSWORD
 export OZI_DATABASE_PASSWORD
 export PGPASSWORD=$OZI_DATABASE_PASSWORD
 
-source ../venv/bin/activate
+if [ -f ".venv/bin/activate" ]; then
+  source .venv/bin/activate
+elif [ -f "../venv/bin/activate" ]; then
+  source ../venv/bin/activate
+fi

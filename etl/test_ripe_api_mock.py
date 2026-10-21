@@ -3,7 +3,7 @@ import requests_mock
 import time
 import requests
 from datetime import datetime
-from etl.extract_from_ripe_api import ripe_api_call, API_URL, RETRIES
+from extract_from_ripe_api import ripe_api_call, API_URL, RETRIES
 
 # Mock data for successful response
 SUCCESS_DATA = {

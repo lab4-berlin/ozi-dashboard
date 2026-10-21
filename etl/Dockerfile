@@ -1,20 +1,27 @@
-# Use an official Python runtime as a parent image
-FROM python:3.13-slim
+# Multi-stage build for ETL production and test images using uv
+FROM python:3.13-slim AS base
 
-# Set the working directory in the container
+COPY --from=ghcr.io/astral-sh/uv:0.6.14 /uv /uvx /bin/
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
 WORKDIR /app
 
-# Copy the requirements file into the container at /app
-COPY requirements.txt .
-# Install any needed packages specified in requirements.txt
-# Use --no-cache-dir to reduce layer size
-RUN pip install --no-cache-dir -r requirements.txt
+# Install production dependencies first (layer caching)
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
 
-# Copy the etl directory content into the container at /app/etl
+# Copy application source
 COPY . /app/etl/
 
-RUN mkdir -p /app/etl/logs
+RUN mkdir -p /app/etl/logs && chmod +x /app/etl/run.sh
 
-# Ensure the run script within etl is executable (if it's used by the python code)
-# Although our primary CMD is different, this maintains its executable state if needed.
-RUN chmod +x /app/etl/run.sh
+ENV PATH=/app/.venv/bin:$PATH
+
+# Test stage: install dev dependencies into the existing virtualenv
+FROM base AS test
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project
