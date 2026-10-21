@@ -4,7 +4,7 @@ from dash import html, dcc, Input, Output, State
 import plotly.express as px
 import sqlalchemy
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Global variables for caching
 last_data_fetch_time = None
@@ -671,11 +671,11 @@ def update_graph_page3(n_intervals, selected_country, start_date, end_date):
         current_df = current_df[current_df["asn_country"] == selected_country]
     
     # Filter by date range if dates are provided
-    if date_from and date_to:
+    if start_date and end_date:
         current_df['date'] = pd.to_datetime(current_df['date'])
-        date_from_dt = pd.to_datetime(date_from)
-        date_to_dt = pd.to_datetime(date_to)
-        current_df = current_df[(current_df['date'] >= date_from_dt) & (current_df['date'] <= date_to_dt)]
+        start_date_dt = pd.to_datetime(start_date)
+        end_date_dt = pd.to_datetime(end_date)
+        current_df = current_df[(current_df['date'] >= start_date_dt) & (current_df['date'] <= end_date_dt)]
     
     fig = px.area(
         current_df,
@@ -704,10 +704,10 @@ def update_graph_page4(n_intervals, selected_country, start_date, end_date):
     if selected_country:
         current_df = current_df[current_df["asn_country"] == selected_country]
     
-    if date_from and date_to:
+    if start_date and end_date:
         current_df = current_df[
-            (current_df["date"] >= date_from) &
-            (current_df["date"] <= date_to)
+            (current_df["date"] >= start_date) &
+            (current_df["date"] <= end_date)
         ]
     
     fig = px.area(
@@ -736,10 +736,10 @@ def update_graph_page5(n_intervals, selected_country, start_date, end_date):
     if selected_country:
         current_df = current_df[current_df["asn_country"] == selected_country]
     
-    if date_from and date_to:
+    if start_date and end_date:
         current_df = current_df[
-            (current_df["date"] >= date_from) &
-            (current_df["date"] <= date_to)
+            (current_df["date"] >= start_date) &
+            (current_df["date"] <= end_date)
         ]
     
     fig = px.area(
@@ -769,10 +769,10 @@ def update_graph_page6(n_intervals, selected_country, start_date, end_date):
     if selected_country:
         current_df = current_df[current_df["asn_country"] == selected_country]
     
-    if date_from and date_to:
+    if start_date and end_date:
         current_df = current_df[
-            (current_df["date"] >= date_from) &
-            (current_df["date"] <= date_to)
+            (current_df["date"] >= start_date) &
+            (current_df["date"] <= end_date)
         ]
     
     fig = px.area(

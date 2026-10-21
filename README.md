@@ -123,16 +123,34 @@ docker compose run ozi-etl python3 etl/main.py -t ASN_NEIGHBOURS -c CZ -df 2025-
 To run the ETL tests, which utilize a separate named volume for the PostgreSQL database to ensure a clean and isolated test environment, use the following command:
 
 ```sh
-DOCKER_BUILDKIT=0 docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --build --entrypoint "pytest" ozi-etl
+docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --build --entrypoint "pytest" ozi-etl
 ```
 
-*   `DOCKER_BUILDKIT=0`: This disables Docker BuildKit, which can sometimes cause issues with `act` or specific Docker Compose setups.
 *   `-f docker-compose.yml`: Includes your main Docker Compose configuration.
-*   `-f docker-compose.test.yml`: Overrides the volume configuration for the `ozi-postgres` service, ensuring tests use a named volume instead of a bind mount.
+*   `-f docker-compose.test.yml`: Overrides the volume configuration for the `ozi-postgres` service, ensuring tests use a named volume instead of a bind mount, and targets the `test` stage.
 *   `--rm`: Removes the container after the command exits.
-*   `--build`: Builds the `ozi-etl` service image if it's not up-to-date.
+*   `--build`: Builds the `ozi-etl` test stage image if it's not up-to-date.
 *   `--entrypoint "pytest"`: Overrides the default entrypoint of the `ozi-etl` container to run `pytest`.
 *   `ozi-etl`: Specifies the service to run the command against.
+
+### Local Development with `uv` (NixOS / Host)
+
+The repository uses [uv](https://docs.astral.sh/uv/) for Python dependency and toolchain management.
+
+*   **ETL:**
+    ```sh
+    cd etl
+    uv sync
+    uv run pytest test_etl_jobs.py test_ripe_api_async.py test_ripe_api_mock.py test_save_api_response.py
+    ```
+    *(Note: database-dependent integration tests require the PostgreSQL container to be running).*
+*   **Plotly Dash:**
+    ```sh
+    cd plotly_dash
+    uv sync
+    uv run python generate_static_graph.py --help
+    ```
+*(On NixOS, ensure `programs.nix-ld.enable = true;` is configured in your system configuration for precompiled binary wheels).*
 
 ## Local CI Simulation with `act`
 
