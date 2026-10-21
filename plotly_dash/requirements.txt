@@ -4,3 +4,5 @@ pandas
 sqlalchemy
 psycopg2-binary
 gunicorn
+duckdb>=1.5.2
+pyarrow>=17.0.0

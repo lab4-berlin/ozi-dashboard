@@ -7,8 +7,8 @@ services:
 
   ozi-etl:
     build:
-      context: ./etl
-      dockerfile: Dockerfile.test
+      context: .
+      dockerfile: etl/Dockerfile.test
 
   plotly-dash-app:
     ports:

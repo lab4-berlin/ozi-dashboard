@@ -12,6 +12,35 @@ country_names_ru = {}
 CACHE_TTL_SECONDS = 60  # Cache will be considered stale after 60 seconds
 
 
+def run_query_df(query):
+    catalog_path = os.environ.get("OZI_LAKE_CATALOG", "/data/ozi_lake.sqlite")
+    storage_backend = os.environ.get("OZI_STORAGE_BACKEND", "both").lower()
+
+    if storage_backend in ("lake", "both") and os.path.exists(catalog_path):
+        try:
+            from common.lake import get_lake_connection
+            con = get_lake_connection(role="reader", read_only=True)
+            try:
+                return con.execute(query).arrow().to_pandas()
+            finally:
+                con.close()
+        except Exception as e:
+            print(f"Notice: DuckLake query fallback to Postgres ({e})")
+
+    db_url = (
+        f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
+        f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
+        f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
+        f"{os.environ.get('DASH_DB_PORT', '5432')}/"
+        f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
+    )
+    engine = sqlalchemy.create_engine(db_url)
+    try:
+        return pd.read_sql(query, engine)
+    finally:
+        engine.dispose()
+
+
 def fetch_data():
     global last_data_fetch_time, cached_df, country_names_ru
 
@@ -25,29 +54,21 @@ def fetch_data():
         return cached_df
 
     print("Fetching new data from database...")
-    db_url = (
-        f"postgresql://{os.environ.get('POSTGRES_OZI_USER', 'user')}:"
-        f"{os.environ.get('POSTGRES_OZI_PASSWORD', 'password')}"
-        f"@{os.environ.get('DASH_DB_HOST', 'localhost')}:"
-        f"{os.environ.get('DASH_DB_PORT', '5432')}/"
-        f"{os.environ.get('DASH_DB_NAME', 'exampledb')}"
-    )
-    engine = sqlalchemy.create_engine(db_url)
 
-    # Fetch country statistics data
+    # Fetch country statistics data with explicit 1d resolution filter
     query_stats = """SELECT
                 cs_country_iso2,
                 cs_stats_timestamp,
                 cs_asns_ris,
                 cs_asns_stats
              FROM data.country_stat
+             WHERE cs_stats_resolution = '1d'
              ORDER BY cs_stats_timestamp;"""
-    df = pd.read_sql(query_stats, engine)
+    df = run_query_df(query_stats)
 
     # Fetch country names in Russian
     query_countries = "SELECT c_iso2, c_name_ru FROM data.country;"
-    df_countries = pd.read_sql(query_countries, engine)
-    engine.dispose()
+    df_countries = run_query_df(query_countries)
 
     # Populate country_names_ru dictionary
     country_names_ru = {

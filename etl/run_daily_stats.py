@@ -52,9 +52,22 @@ def main():
     if returncode != 0:
         print("ETL job failed. Exiting.", file=sys.stderr)
         sys.exit(1)
-    else:
-        print("ETL job completed successfully.")
-        sys.exit(0)
+
+    print("ETL job completed successfully.")
+
+    # Step 4: Finalize materialized views in DuckLake
+    print("Running DuckLake finalization...")
+    finalize_stdout, finalize_stderr, finalize_code = run_command(["python3", "etl/main.py", "-t", "FINALIZE"])
+    print(finalize_stdout)
+    if finalize_stderr:
+        print(finalize_stderr, file=sys.stderr)
+
+    if finalize_code != 0:
+        print("Warning: DuckLake finalization failed.", file=sys.stderr)
+        sys.exit(1)
+
+    print("Daily pipeline and finalization completed successfully.")
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()

@@ -26,8 +26,8 @@ services:
 
   ozi-etl:
     build:
-      context: ./etl
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: etl/Dockerfile
     env_file:
       - .env.ozi
     container_name: ozi_etl
@@ -40,17 +40,19 @@ services:
       POSTGRES_HOST: ozi-postgres
     volumes:
       - ./etl/logs:/app/etl/logs
+      - ./common:/app/common:ro
     networks:
       - ozi_network
 
   plotly-dash-app:
     build:
-      context: ./plotly_dash
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: plotly_dash/Dockerfile
     container_name: plotly_dash_app
     env_file:
       - .env.ozi
     restart: always
+    mem_limit: 2g
     depends_on:
       ozi-postgres:
         condition: service_healthy
@@ -60,6 +62,7 @@ services:
       DASH_DB_NAME: ${POSTGRES_DB:-ozi_db2}
     volumes:
       - ./generated_graphs:/app/generated_graphs
+      - ./common:/app/common:ro
     networks:
       - ozi_network
 

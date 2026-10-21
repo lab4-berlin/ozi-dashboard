@@ -1,0 +1,11 @@
+# Litestream configuration for OZI SQLite DuckLake catalog continuous replication
+dbs:
+  - path: /data/ozi_lake.sqlite
+    replicas:
+      - type: s3
+        bucket: "${OZI_S3_BUCKET}"
+        path: catalog_backup
+        endpoint: "${OZI_S3_ENDPOINT}"
+        access-key-id: "${OZI_S3_ACCESS_KEY_ID}"
+        secret-access-key: "${OZI_S3_SECRET_ACCESS_KEY}"
+        path-style: true
