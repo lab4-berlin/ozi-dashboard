@@ -1,6 +1,6 @@
 # ozi-dashboard
 
-This project provides an ETL pipeline and a PostgreSQL database to store and analyze AS (Autonomous System) statistics. It also includes an optional Redash service for data visualization.
+This project provides an ETL pipeline and a PostgreSQL database to store and analyze AS (Autonomous System) statistics.
 
 ## Prerequisites
 
@@ -9,20 +9,19 @@ This project provides an ETL pipeline and a PostgreSQL database to store and ana
 
 ## Quick Start
 
-For a quick start, you can use the provided example files:
+For a quick start, you can use the provided example file:
 
 ```sh
 cp .env.ozi.example .env.ozi
-cp .env.redash.example .env.redash
 ```
 
-This will create the required `.env.ozi` and `.env.redash` files with default credentials that you can use to get started quickly.
+This will create the required `.env.ozi` file with default credentials that you can use to get started quickly.
 
 ## Setup
 
 1.  **Environment Variables:**
 
-    Create two environment files in the root of the project: `.env.ozi` and `.env.redash`.
+    Create an `.env.ozi` environment file in the root of the project:
 
     **`.env.ozi`**
 
@@ -42,34 +41,6 @@ This will create the required `.env.ozi` and `.env.redash` files with default cr
     cp .env.ozi.example .env.ozi
     ```
 
-    **`.env.redash`**
-
-    This file stores the credentials for the Redash services. Create the file and add the following content:
-
-    ```env
-    REDASH_COOKIE_SECRET=placeholder
-    REDASH_SECRET_KEY=placeholder
-    REDASH_POSTGRES_PASSWORD=placeholder
-    ```
-
-    You can also copy the `.env.redash.example` file:
-
-    ```sh
-    cp .env.redash.example .env.redash
-    ```
-
-    To generate strong random values for `REDASH_COOKIE_SECRET`, `REDASH_SECRET_KEY`, and `REDASH_POSTGRES_PASSWORD`, you can use the following command:
-
-    ```sh
-    # For REDASH_COOKIE_SECRET and REDASH_SECRET_KEY
-    openssl rand -hex 32
-
-    # For REDASH_POSTGRES_PASSWORD
-    openssl rand -hex 16
-    ```
-
-    Copy the generated values into the `.env.redash` file.
-
 2.  **Build and Run:**
 
     To build the images and start the services, run the following command from the project root:
@@ -80,27 +51,12 @@ This will create the required `.env.ozi` and `.env.redash` files with default cr
 
     This will start the `ozi-postgres` and `ozi-etl` services.
 
-3.  **Running Redash (Optional):**
-
-    To run the Redash services, you first need to create the database tables. Run the following command:
-
-    ```sh
-    docker compose run --rm redash-server create_db
-    ```
-
-    Then, to start the Redash services, use the `redash` profile:
-
-    ```sh
-    docker compose --profile redash up -d
-    ```
-
 ## Accessing Services
 
 Services are accessible in two ways:
 
 -   **From your local machine (the host):** Services with published ports can be accessed via `localhost`.
     -   **OZI PostgreSQL:** `localhost:5432`
-    -   **Redash:** `http://localhost:5000`
 -   **From other services within Docker:** Services connect to each other using their service names as hostnames. For example, the `ozi-etl` service connects to the database at `ozi-postgres:5432`.
 
 You can monitor the ETL service logs with:
@@ -169,12 +125,6 @@ To stop the services, run:
 
 ```sh
 docker compose down
-```
-
-To stop the Redash services as well, run:
-
-```sh
-docker compose --profile redash down
 ```
 
 If you want to remove the volumes (including PostgreSQL data), use:
