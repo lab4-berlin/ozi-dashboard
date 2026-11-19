@@ -64,7 +64,7 @@ services:
       - ozi_network
 
   nginx:
-    image: nginx:alpine
+    image: nginx:1.31.9-alpine
     container_name: ozi_nginx
     restart: always
     ports:
