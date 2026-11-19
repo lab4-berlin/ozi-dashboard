@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Refresh base images and rebuild daily at 3:00 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -36,6 +40,8 @@ jobs:
         ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} " \
           cd ${PROJECT_DIR} && \
           git pull --rebase && \
-          docker compose up -d --build && \
+          docker compose pull && \
+          docker compose build --pull && \
+          docker compose up -d && \
           docker image prune -a -f \
         "

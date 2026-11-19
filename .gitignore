@@ -3,3 +3,5 @@ etl/logs/*
 *.env.*
 !.env.*.example
 .idea
+.venv/
+__pycache__/

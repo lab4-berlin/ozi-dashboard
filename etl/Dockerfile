@@ -1,14 +1,16 @@
 # Use an official Python runtime as a parent image
 FROM python:3.13-slim
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file into the container at /app
-COPY requirements.txt .
-# Install any needed packages specified in requirements.txt
-# Use --no-cache-dir to reduce layer size
-RUN pip install --no-cache-dir -r requirements.txt
+# Install production dependencies from uv.lock
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project --no-cache
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy the etl directory content into the container at /app/etl
 COPY . /app/etl/

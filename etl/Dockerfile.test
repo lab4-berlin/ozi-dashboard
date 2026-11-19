@@ -2,6 +2,4 @@ FROM ozi-dashboard-ozi-etl:latest
 
 WORKDIR /app
 
-COPY requirements-dev.txt .
-
-RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN uv sync --frozen --no-install-project --no-cache

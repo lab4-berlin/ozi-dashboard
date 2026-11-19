@@ -1,0 +1,12 @@
+[project]
+name = "ozi-plotly-dash"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "dash>=2.18",
+    "gunicorn>=23.0",
+    "pandas>=2.2",
+    "plotly>=5.24",
+    "psycopg2-binary>=2.9.11",
+    "sqlalchemy>=2.0.36,<2.1",
+]
